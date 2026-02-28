@@ -1,0 +1,89 @@
+package com.ninecsdev.wallpaperchanger.service
+
+import android.app.WallpaperManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.os.PowerManager
+import android.util.Log
+import com.ninecsdev.wallpaperchanger.data.WallpaperRepository
+import com.ninecsdev.wallpaperchanger.logic.BufferManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
+
+class ScreenOffReceiver : BroadcastReceiver() {
+
+    private val tag = "ScreenOffReceiver"
+
+    companion object {
+        // Prevents multiple concurrent swaps if the power button is clicked many times
+        private val isWorkInProgress = AtomicBoolean(false)
+    }
+
+    override fun onReceive(context: Context?, intent: Intent?) {
+        if (context == null || intent?.action != Intent.ACTION_SCREEN_OFF) return
+
+        if (!isWorkInProgress.compareAndSet(false, true)) {
+            Log.d(tag, "Work already in progress. Skipping.")
+            return
+        }
+
+        val pendingResult = goAsync()
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // 250ms delay for Nothing Phone (1) animation
+                delay(250) //TODO: let the user choose the delay
+
+                // Safety check: if the user woke the screen during the delay abort
+                if (powerManager.isInteractive) {
+                    Log.w(tag, "Screen woke up. Aborting.")
+                    return@launch
+                }
+
+                // Apply the pre-processed buffer image and prepare next image
+                applyBufferToLockScreen(context)
+                WallpaperRepository.refillDiskBuffer()
+            } catch (e: Exception) {
+                Log.e(tag, "Error during wallpaper change", e)
+            } finally {
+                isWorkInProgress.set(false)
+                pendingResult.finish()
+            }
+        }
+    }
+
+    /**
+     * Reads the .webp buffer from disk and streams it to the WallpaperManager.
+     * This bypasses the Bitmap heap, preventing OutOfMemory errors
+     * and instantly changes the wallpaper.
+     */
+    private fun applyBufferToLockScreen(context: Context) {
+        try {
+            val bufferFile = BufferManager.getBufferFile()
+
+            if (!bufferFile.exists()) {
+                Log.w(tag, "Buffer file missing. Is the service initialized?")
+                return
+            }
+
+            bufferFile.inputStream().use { stream ->
+                val wallpaperManager = WallpaperManager.getInstance(context)
+                wallpaperManager.setStream(
+                    stream,
+                    null,
+                    true,
+                    WallpaperManager.FLAG_LOCK
+                )
+            }
+            Log.i(tag, "Wallpaper applied successfully from disk buffer.")
+
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to stream buffer to lock screen", e)
+        }
+    }
+}
