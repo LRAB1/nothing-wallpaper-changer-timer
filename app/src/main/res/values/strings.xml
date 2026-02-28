@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">WallpaperChanger</string>
+    <string name="status_running">Service is RUNNING</string>
+    <string name="status_stopped">Service is STOPPED</string>
+    <string name="status_disabled_power">Service disabled (Power Save Mode)</string>
+    <string name="status_disabled_folder">Service disabled (No folder selected)</string>
+    <string name="status_loading">Loading…</string>
 </resources>

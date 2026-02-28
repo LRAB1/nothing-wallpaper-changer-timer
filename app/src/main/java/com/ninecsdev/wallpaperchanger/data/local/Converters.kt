@@ -1,0 +1,46 @@
+package com.ninecsdev.wallpaperchanger.data.local
+
+import android.net.Uri
+import android.util.Log
+import androidx.room.TypeConverter
+import com.ninecsdev.wallpaperchanger.model.CollectionType
+import com.ninecsdev.wallpaperchanger.model.CropRule
+
+/**
+ * Type converters for Room Database.
+ * Converts complex objects into primitives that SQLite can store.
+ */
+class Converters {
+    // Uri Converters
+    @TypeConverter
+    fun fromUri(uri: Uri?): String? = uri?.toString()
+
+    @TypeConverter
+    fun toUri(uriString: String?): Uri? = uriString?.let { Uri.parse(it) }
+
+    // CollectionType Converters
+    @TypeConverter
+    fun fromCollectionType(type: CollectionType): String = type.name
+
+    @TypeConverter
+    fun toCollectionType(value: String): CollectionType =
+        try {
+            CollectionType.valueOf(value)
+        } catch (e: IllegalArgumentException) {
+            Log.e( "Converters", "Invalid CollectionType: $value", e)
+            CollectionType.FOLDER
+        }
+
+    // CropRule Converters
+    @TypeConverter
+    fun fromCropRule(rule: CropRule): String = rule.name
+
+    @TypeConverter
+    fun toCropRule(value: String): CropRule =
+        try {
+            CropRule.valueOf(value)
+        } catch (e: IllegalArgumentException) {
+            Log.e("Converters", "Invalid CropRule: $value", e)
+            CropRule.CENTER
+        }
+}
