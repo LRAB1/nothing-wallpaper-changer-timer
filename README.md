@@ -4,7 +4,7 @@
   <h1>Wallpaper Changer for Nothing OS</h1>
 
   <p align="center">
-    <img src="https://img.shields.io/badge/Status-v0.2--alpha-blue.svg" alt="Status">
+    <img src="https://img.shields.io/badge/Status-v0.2--beta-blue.svg" alt="Status">
     <img src="https://img.shields.io/badge/Android-13%2B-green.svg" alt="Android 13+">
     <img src="https://img.shields.io/badge/Kotlin-2.1-purple.svg" alt="Kotlin">
     <img src="https://img.shields.io/badge/Jetpack%20Compose-Material%203-teal.svg" alt="Compose">
