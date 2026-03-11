@@ -1,9 +1,11 @@
 package com.ninecsdev.wallpaperchanger.service
 
+import android.app.AlarmManager
 import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.app.WallpaperManager
 import android.content.BroadcastReceiver
@@ -14,10 +16,12 @@ import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.ninecsdev.wallpaperchanger.R
 import com.ninecsdev.wallpaperchanger.data.WallpaperRepository
+import com.ninecsdev.wallpaperchanger.model.RotationTrigger
 import com.ninecsdev.wallpaperchanger.model.ServiceState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -88,19 +92,9 @@ class WallpaperService : Service() {
         WallpaperRepository.initialize(this)
         createNotificationChannel()
 
-        screenOffReceiver = ScreenOffReceiver()
-        registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), RECEIVER_EXPORTED)
-
         systemEventReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val pm = context.getSystemService(POWER_SERVICE) as PowerManager
-
-                // This part stopped the app when battery was under 15% but as we now pause the app
-                // it is no longer needed. Keep it in case i want to re-implement it
-                /*if (intent.action == Intent.ACTION_BATTERY_LOW) {
-                    handleStopCommand()
-                    return
-                }*/
 
                 if (pm.isPowerSaveMode) {
                     pauseEngine()
@@ -149,7 +143,15 @@ class WallpaperService : Service() {
                 notifyUiStarted()
 
                 val activeName = WallpaperRepository.getActiveCollectionOnce()?.name ?: "ACTIVE"
-                updateNotification("Cycling: $activeName")
+                val config = WallpaperRepository.getWallpaperConfig()
+
+                if (config.rotationTrigger == RotationTrigger.TIMED) {
+                    scheduleTimerAlarm(config.timerInterval.milliseconds)
+                    updateNotification("Timed rotation: ${config.timerInterval.displayName} — $activeName")
+                } else {
+                    registerScreenOffReceiver()
+                    updateNotification("Cycling: $activeName")
+                }
             }else{
                 Log.w(tag, "Abort startup: No collection found.")
                 WallpaperRepository.setStartingUp(false)
@@ -167,25 +169,7 @@ class WallpaperService : Service() {
         isPaused = false
         notifyUiStopped()
 
-        serviceScope.launch {
-            val config = WallpaperRepository.getWallpaperConfig()
-            if (config.revertToDefaultOnStop) {
-                applyDefaultWallpaper(applicationContext)
-            }
-            stopSelf()
-        }
-    }
-
-    /**
-     * Pauses the wallpaper changing by unregistering the ScreenOffReceiver.
-     * The foreground service stays alive so it can auto-resume.
-     */
-    private fun pauseEngine() {
-        if (isPaused) return
-        Log.i(tag, "Pausing engine (Power Save ON)")
-        isPaused = true
-        WallpaperRepository.setServicePaused(true)
-
+        cancelTimerAlarm()
         screenOffReceiver?.let {
             unregisterReceiver(it)
             screenOffReceiver = null
@@ -196,6 +180,35 @@ class WallpaperService : Service() {
             if (config.revertToDefaultOnStop) {
                 applyDefaultWallpaper(applicationContext)
             }
+            stopSelf()
+        }
+    }
+
+    /**
+     * Pauses the wallpaper changing by unregistering the ScreenOffReceiver
+     * or cancelling the timer alarm depending on the active rotation trigger.
+     * The foreground service stays alive so it can auto-resume.
+     */
+    private fun pauseEngine() {
+        if (isPaused) return
+        Log.i(tag, "Pausing engine (Power Save ON)")
+        isPaused = true
+        WallpaperRepository.setServicePaused(true)
+
+        val config = WallpaperRepository.getWallpaperConfig()
+        if (config.rotationTrigger == RotationTrigger.TIMED) {
+            cancelTimerAlarm()
+        } else {
+            screenOffReceiver?.let {
+                unregisterReceiver(it)
+                screenOffReceiver = null
+            }
+        }
+
+        serviceScope.launch {
+            if (config.revertToDefaultOnStop) {
+                applyDefaultWallpaper(applicationContext)
+            }
         }
 
         updateNotification("Paused (Power Save)")
@@ -203,7 +216,8 @@ class WallpaperService : Service() {
     }
 
     /**
-     * Resumes the wallpaper changing by re-registering the ScreenOffReceiver.
+     * Resumes the wallpaper changing by re-registering the ScreenOffReceiver
+     * or rescheduling the timer alarm depending on the active rotation trigger.
      */
     private fun resumeEngine() {
         if (!isPaused) return
@@ -211,12 +225,19 @@ class WallpaperService : Service() {
         isPaused = false
         WallpaperRepository.setServicePaused(false)
 
-        screenOffReceiver = ScreenOffReceiver()
-        registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), RECEIVER_EXPORTED)
-
-        serviceScope.launch {
-            val activeName = WallpaperRepository.getActiveCollectionOnce()?.name ?: "ACTIVE"
-            updateNotification("Cycling: $activeName")
+        val config = WallpaperRepository.getWallpaperConfig()
+        if (config.rotationTrigger == RotationTrigger.TIMED) {
+            scheduleTimerAlarm(config.timerInterval.milliseconds)
+            serviceScope.launch {
+                val activeName = WallpaperRepository.getActiveCollectionOnce()?.name ?: "ACTIVE"
+                updateNotification("Timed rotation: ${config.timerInterval.displayName} — $activeName")
+            }
+        } else {
+            registerScreenOffReceiver()
+            serviceScope.launch {
+                val activeName = WallpaperRepository.getActiveCollectionOnce()?.name ?: "ACTIVE"
+                updateNotification("Cycling: $activeName")
+            }
         }
         notifyUiStarted()
     }
@@ -226,12 +247,53 @@ class WallpaperService : Service() {
         isAlive = false
         Log.i(tag, "Service Destroyed. Cleaning up.")
 
+        cancelTimerAlarm()
         screenOffReceiver?.let { unregisterReceiver(it) }
         systemEventReceiver?.let { unregisterReceiver(it) }
 
         WallpaperRepository.clearMagazine()
         serviceScope.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)
+    }
+
+    // AlarmManager helpers for TIMED rotation mode
+
+    private fun getTimerPendingIntent(): PendingIntent {
+        val intent = Intent(this, TimerReceiver::class.java).apply {
+            action = TimerReceiver.ACTION_TIMER_WALLPAPER
+        }
+        return PendingIntent.getBroadcast(
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun scheduleTimerAlarm(intervalMs: Long) {
+        val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+        val pendingIntent = getTimerPendingIntent()
+        val triggerAt = SystemClock.elapsedRealtime() + intervalMs
+        alarmManager.setInexactRepeating(
+            AlarmManager.ELAPSED_REALTIME_WAKEUP,
+            triggerAt,
+            intervalMs,
+            pendingIntent
+        )
+        Log.i(tag, "Timer alarm scheduled: interval=${intervalMs}ms")
+    }
+
+    private fun cancelTimerAlarm() {
+        val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+        alarmManager.cancel(getTimerPendingIntent())
+        Log.d(tag, "Timer alarm cancelled.")
+    }
+
+    // ScreenOffReceiver helpers
+
+    private fun registerScreenOffReceiver() {
+        screenOffReceiver = ScreenOffReceiver()
+        registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), RECEIVER_EXPORTED)
     }
 
     private fun notifyUiStarted() = WallpaperRepository.notifyServiceStateChanged()

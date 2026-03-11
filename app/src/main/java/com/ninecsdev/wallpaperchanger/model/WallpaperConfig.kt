@@ -10,7 +10,9 @@ import android.net.Uri
  */
 data class WallpaperConfig(
     val defaultWallpaperUri: Uri? = null,
-    val revertToDefaultOnStop: Boolean = true
+    val revertToDefaultOnStop: Boolean = true,
+    val rotationTrigger: RotationTrigger = RotationTrigger.ON_LOCK,
+    val timerInterval: TimerInterval = TimerInterval.DAILY
 ) {
     /** Helper to check if a fallback wallpaper has been configured. */
     val hasDefaultWallpaper: Boolean get() = defaultWallpaperUri != null

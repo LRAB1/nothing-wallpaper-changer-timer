@@ -29,6 +29,15 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".service.TimerReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.ninecsdev.wallpaperchanger.ACTION_TIMER_WALLPAPER" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".ui.MainActivity"
             android:exported="true">

@@ -29,7 +29,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.ninecsdev.wallpaperchanger.R
+import com.ninecsdev.wallpaperchanger.model.RotationTrigger
 import com.ninecsdev.wallpaperchanger.model.ServiceState
+import com.ninecsdev.wallpaperchanger.model.TimerInterval
 import com.ninecsdev.wallpaperchanger.model.WallpaperConfig
 import com.ninecsdev.wallpaperchanger.ui.theme.NothingBlack
 import com.ninecsdev.wallpaperchanger.ui.theme.NothingWhite
@@ -55,6 +57,13 @@ fun MainScreen(
         onOpenCollectionsClick = onOpenCollections,
         onSelectDefaultClick = onSelectDefault,
         onToggleRevert = { viewModel.setRevertToDefault(it) },
+        onToggleTimedMode = { enabled ->
+            viewModel.setRotationTrigger(
+                if (enabled) RotationTrigger.TIMED
+                else RotationTrigger.ON_LOCK
+            )
+        },
+        onIntervalSelected = { viewModel.setTimerInterval(it) },
         onStartClick = onStartRequest,
         onStopClick = onStopRequest
     )
@@ -63,7 +72,7 @@ fun MainScreen(
 /**
  * Stateless UI for the main screen.
  * Composed of the status header, collection selection card,
- * default wallpaper card, and service control buttons.
+ * default wallpaper card, timer settings card, and service control buttons.
  */
 @Composable
 fun MainScreenContent(
@@ -73,7 +82,9 @@ fun MainScreenContent(
     onSelectFolderClick: () -> Unit,
     onOpenCollectionsClick: () -> Unit,
     onToggleRevert: (Boolean) -> Unit,
-    onSelectDefaultClick: () -> Unit
+    onSelectDefaultClick: () -> Unit,
+    onToggleTimedMode: (Boolean) -> Unit = {},
+    onIntervalSelected: (TimerInterval) -> Unit = {}
 ) {
     Scaffold(
         containerColor = NothingBlack,
@@ -131,6 +142,15 @@ fun MainScreenContent(
                     defaultUri = uiState.config.defaultWallpaperUri,
                     onToggleRevert = onToggleRevert,
                     onSelectDefaultClick = onSelectDefaultClick
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                TimerSettingsCard(
+                    rotationTrigger = uiState.config.rotationTrigger,
+                    timerInterval = uiState.config.timerInterval,
+                    onToggleTimedMode = onToggleTimedMode,
+                    onIntervalSelected = onIntervalSelected
                 )
             }
 
