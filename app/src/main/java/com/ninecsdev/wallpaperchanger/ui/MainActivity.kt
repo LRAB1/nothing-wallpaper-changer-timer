@@ -67,12 +67,9 @@ class MainActivity : ComponentActivity() {
 
     // Default wallpaper picker
     private val defaultWallpaperLauncher = registerForActivityResult(
-        ActivityResultContracts.OpenDocument()
+        ActivityResultContracts.PickVisualMedia()
     ) { uri ->
-        uri?.let {
-            contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            mainViewModel.saveDefaultWallpaperUri(it)
-        }
+        uri?.let { mainViewModel.internalizeAndSaveDefaultWallpaper(it) }
     }
 
     // Battery optimization exemption (Required for boot-start)
@@ -120,7 +117,11 @@ class MainActivity : ComponentActivity() {
                                     collectionViewModel.setPickerMode(false)
                                     mainViewModel.setShowLists(true)
                                 },
-                                onSelectDefault = { defaultWallpaperLauncher.launch(arrayOf("image/*")) },
+                                onSelectDefault = {
+                                    defaultWallpaperLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                },
                                 onStartRequest = { checkPermissionsAndStart() },
                                 onStopRequest = {
                                     val intent = Intent(

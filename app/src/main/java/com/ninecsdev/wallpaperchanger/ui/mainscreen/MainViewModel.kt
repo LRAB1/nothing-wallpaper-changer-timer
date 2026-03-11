@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ninecsdev.wallpaperchanger.data.WallpaperRepository
+import com.ninecsdev.wallpaperchanger.logic.ImageInternalizer
 import com.ninecsdev.wallpaperchanger.model.ServiceState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,9 +18,9 @@ import kotlinx.coroutines.launch
 /**
  * ViewModel for the Main Dashboard screen.
  * Builds [MainUiState] reactively by combining three independent flows:
- *   1. Collections (Room) — active collection + previews
- *   2. Service events — service state changes
- *   3. Config flow — user preferences
+ *   1. Collections (Room) - active collection + previews
+ *   2. Service events - service state changes
+ *   3. Config flow - user preferences
  */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -75,7 +76,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = MainUiState()
     )
 
-    // ── Actions ──────────────────────────────────────────────────────────
+    // Actions
 
     fun setActiveCollection(collectionId: Long) {
         viewModelScope.launch {
@@ -91,8 +92,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.setRevertToDefault(isChecked)
     }
 
-    fun saveDefaultWallpaperUri(uri: Uri) {
-        repository.saveDefaultWallpaperUri(uri)
+    fun internalizeAndSaveDefaultWallpaper(uri: Uri) {
+        viewModelScope.launch {
+            val previousUri = repository.getWallpaperConfig().defaultWallpaperUri
+            if (previousUri != null) ImageInternalizer.deleteInternalFile(previousUri.path)
+            val internalized = ImageInternalizer.internalizeImages(getApplication(), listOf(uri))
+            internalized.firstOrNull()?.let { repository.saveDefaultWallpaperUri(it) }
+        }
     }
 
     /**

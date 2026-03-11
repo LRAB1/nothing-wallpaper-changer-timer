@@ -1,6 +1,6 @@
 <div align="center">
   <img src="app/src/main/ic_launcher-playstore.png" width="300" alt="App Icon"/>
-  
+
   <h1>Wallpaper Changer for Nothing OS</h1>
 
   <p align="center">
@@ -32,8 +32,8 @@ There weren't many solutions on the Play Store and the ones I found were either 
 
 - **Instant Wallpaper Swap:** Each wallpaper is pre-processed and ready to go before you lock your phone resulting in no lag or  no loading screens. *(Achieved via a disk-buffered pipeline: downsample → crop → WebP.)*
 - **Wallpaper Collections/Lists:** Organize wallpapers in two ways:
-  - **Folder-based:** Point the app at a folder on your device and it picks up all the images inside, with re-sync on demand.
-  - **Manual:** Hand-pick individual photos; they're safely copied into the app's private storage so they're always available.
+    - **Folder-based:** Point the app at a folder on your device and it picks up all the images inside, with re-sync on demand.
+    - **Manual:** Hand-pick individual photos; they're safely copied into the app's private storage so they're always available.
 - **Smart Shuffle:** Every image is shown exactly once before the collection reshuffles in order to never getting any individual wallpaper too often.
 - **Flexible Cropping:** Choose how images fit your screen per collection: center, left-aligned, right-aligned, or fit-to-screen.
 - **Quick Settings Tile:** Start, stop, or check status right from the notification shade letting you control it while doing something else.
@@ -148,7 +148,7 @@ gradlew.bat assembleDebug      # Windows
 
 The app follows a clean layered architecture: **data** (Room + repository), **logic** (image pipeline), **model** (entities & enums), **service** (foreground service + receivers), and **ui** (single-activity Compose with MVVM).
 
-> For the full project structure and design decisions, see [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md).
+> For the full project structure and design decisions, see [docs/ARCHITECTURE.md](/docs/ARCHITECTURE.md).
 
 ### How It Works
 
@@ -163,29 +163,28 @@ The app follows a clean layered architecture: **data** (Room + repository), **lo
 
 ## Tech Stack
 
-| Category | Library / API |
-|---|---|
-| Language | Kotlin 2.1 (JVM 17) |
-| UI | Jetpack Compose + Material 3 |
-| Image loading | Coil 2.7 |
-| Database | Room 2.7 (KSP) |
-| Async | Kotlin Coroutines + `SupervisorJob` |
-| Lifecycle | ViewModel + StateFlow / SharedFlow |
-| Min SDK | 33 (Android 13) |
-| Target SDK | 36 (Android 15) |
-| Compile SDK | 36 |
+| Category      | Library / API                       |
+|---------------|-------------------------------------|
+| Language      | Kotlin 2.1 (JVM 17)                 |
+| UI            | Jetpack Compose + Material 3        |
+| Image loading | Coil 2.7                            |
+| Database      | Room 2.7 (KSP)                      |
+| Async         | Kotlin Coroutines + `SupervisorJob` |
+| Lifecycle     | ViewModel + StateFlow / SharedFlow  |
+| Min SDK       | 33 (Android 13)                     |
+| Target SDK    | 36 (Android 16)                     |
 
 ---
 
 ## Permissions
 
-| Permission | Reason |
-|---|---|
-| `SET_WALLPAPER` | Apply wallpapers to the lock screen |
-| `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_SPECIAL_USE` | Keep the screen-off listener alive in the background |
-| `POST_NOTIFICATIONS` | Show the required foreground service notification |
-| `RECEIVE_BOOT_COMPLETED` | Restart the service after a reboot |
-| `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | Improve reliability of boot-start and background operation |
+| Permission                                              | Reason                                                     |
+|---------------------------------------------------------|------------------------------------------------------------|
+| `SET_WALLPAPER`                                         | Apply wallpapers to the lock screen                        |
+| `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_SPECIAL_USE` | Keep the screen-off listener alive in the background       |
+| `POST_NOTIFICATIONS`                                    | Show the required foreground service notification          |
+| `RECEIVE_BOOT_COMPLETED`                                | Restart the service after a reboot                         |
+| `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`                  | Improve reliability of boot-start and background operation |
 
 No internet permission is requested — your images never leave your device.
 
