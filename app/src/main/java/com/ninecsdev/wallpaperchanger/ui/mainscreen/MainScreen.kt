@@ -152,6 +152,9 @@ fun MainScreenContent(
                     onToggleTimedMode = onToggleTimedMode,
                     onIntervalSelected = onIntervalSelected
                 )
+
+                // Extra bottom padding so the last card clears the floating Start/Stop button
+                Spacer(modifier = Modifier.height(96.dp))
             }
 
             Box(
