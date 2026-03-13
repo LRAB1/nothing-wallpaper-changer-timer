@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -23,8 +21,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -36,38 +32,12 @@ import com.ninecsdev.wallpaperchanger.ui.theme.NothingBlack
 import com.ninecsdev.wallpaperchanger.ui.theme.NothingWhite
 
 /**
- * Stateful wrapper for the Main Dashboard.
- * Connects the ViewModel state to the Stateless [MainScreenContent].
- */
-@Composable
-fun MainScreen(
-    viewModel: MainViewModel,
-    onSelectFolder: () -> Unit,
-    onOpenCollections: () -> Unit,
-    onSelectDefault: () -> Unit,
-    onStartRequest: () -> Unit,
-    onStopRequest: () -> Unit
-) {
-    val uiState by viewModel.uiState.collectAsState()
-
-    MainScreenContent(
-        uiState = uiState,
-        onSelectFolderClick = onSelectFolder,
-        onOpenCollectionsClick = onOpenCollections,
-        onSelectDefaultClick = onSelectDefault,
-        onToggleRevert = { viewModel.setRevertToDefault(it) },
-        onStartClick = onStartRequest,
-        onStopClick = onStopRequest
-    )
-}
-
-/**
  * Stateless UI for the main screen.
  * Composed of the status header, collection selection card,
  * default wallpaper card, and service control buttons.
  */
 @Composable
-fun MainScreenContent(
+fun MainScreen(
     uiState: MainUiState,
     onStartClick: () -> Unit,
     onStopClick: () -> Unit,
@@ -170,7 +140,7 @@ fun MainScreenContent(
 fun MainScreenRunningPreview() {
     MaterialTheme {
         CompositionLocalProvider(LocalContentColor provides NothingWhite) {
-            MainScreenContent(
+            MainScreen(
                 uiState = MainUiState(
                     serviceState = ServiceState.Running,
                     revertToDefaultOnStop = true
@@ -191,7 +161,7 @@ fun MainScreenRunningPreview() {
 fun MainScreenEmptyPreview() {
     MaterialTheme {
         CompositionLocalProvider(LocalContentColor provides NothingWhite) {
-            MainScreenContent(
+            MainScreen(
                 uiState = MainUiState(
                     serviceState = ServiceState.DisabledNoCollection,
                     activeCollection = null

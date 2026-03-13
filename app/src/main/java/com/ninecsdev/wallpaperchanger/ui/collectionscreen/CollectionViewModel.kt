@@ -6,8 +6,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ninecsdev.wallpaperchanger.data.WallpaperRepository
 import com.ninecsdev.wallpaperchanger.logic.ImageInternalizer
+import com.ninecsdev.wallpaperchanger.model.CollectionSortOrder
 import com.ninecsdev.wallpaperchanger.model.CropRule
-import com.ninecsdev.wallpaperchanger.model.ServiceState
 import com.ninecsdev.wallpaperchanger.model.WallpaperCollection
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -34,6 +34,9 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
     /** Preview thumbnails loaded on-demand for visible grid items. */
     private val _previewStates = MutableStateFlow<Map<Long, CollectionPreviewState>>(emptyMap())
 
+    /** Current sort order for the collection list. */
+    private val _sortOrder = MutableStateFlow(CollectionSortOrder.LAST_USED)
+
     /** Modal/processing state managed by this screen. */
     private val _screenState = MutableStateFlow(ScreenModalState())
 
@@ -42,12 +45,20 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
         repository.getAllCollections(),
         _previewStates,
         _screenState,
+        _sortOrder,
         repository.serviceEvent.onStart { emit(Unit) }
-    ) { collections, previews, modal, _ ->
+    ) { collections, previews, modal, sort, _ ->
+        val sorted = when (sort) {
+            CollectionSortOrder.NAME -> collections.sortedBy { it.name.lowercase() }
+            CollectionSortOrder.LAST_USED -> collections.sortedByDescending { it.lastUsedAt }
+            CollectionSortOrder.DATE_CREATED -> collections.sortedByDescending { it.createdAt }
+        }
+
         CollectionUiState(
-            allCollections = collections,
+            allCollections = sorted,
             previewStates = previews,
             serviceState = repository.getServiceState(),
+            sortOrder = sort,
             isPickerMode = modal.isPickerMode,
             isShowingCreateModal = modal.isShowingCreateModal,
             editingCollection = modal.editingCollection,
@@ -139,6 +150,12 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
                 current + (collectionId to CollectionPreviewState(uris, size))
             }
         }
+    }
+
+    // Sort order
+
+    fun setSortOrder(order: CollectionSortOrder) {
+        _sortOrder.value = order
     }
 
     // Modal/navigation helpers

@@ -103,27 +103,29 @@ class MainActivity : ComponentActivity() {
                                         collection?.let { collectionViewModel.openEditModal(it) }
                                     }
                                 },
+                                onSortOrderChange = { collectionViewModel.setSortOrder(it) },
                                 onAddClick = { collectionViewModel.toggleCreateModal(true) },
                                 onBackClick = { mainViewModel.setShowLists(false) }
                             )
                         } else {
                             MainScreen(
-                                viewModel = mainViewModel,
-                                onSelectFolder = {
+                                uiState = mainState,
+                                onSelectFolderClick = {
                                     collectionViewModel.setPickerMode(true)
                                     mainViewModel.setShowLists(true)
                                 },
-                                onOpenCollections = {
+                                onOpenCollectionsClick = {
                                     collectionViewModel.setPickerMode(false)
                                     mainViewModel.setShowLists(true)
                                 },
-                                onSelectDefault = {
+                                onSelectDefaultClick = {
                                     defaultWallpaperLauncher.launch(
                                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                     )
                                 },
-                                onStartRequest = { checkPermissionsAndStart() },
-                                onStopRequest = {
+                                onToggleRevert = { mainViewModel.setRevertToDefault(it) },
+                                onStartClick = { checkPermissionsAndStart() },
+                                onStopClick = {
                                     val intent = Intent(
                                         this@MainActivity,
                                         WallpaperService::class.java
