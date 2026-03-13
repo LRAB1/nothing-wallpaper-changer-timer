@@ -39,6 +39,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.ninecsdev.wallpaperchanger.R
 import com.ninecsdev.wallpaperchanger.model.CropRule
 import com.ninecsdev.wallpaperchanger.ui.components.CropRuleSelector
@@ -65,8 +66,10 @@ fun CreateListCard(
     var listName by remember { mutableStateOf("") }
     var selectedRule by remember { mutableStateOf(CropRule.CENTER) }
 
-    Dialog(onDismissRequest = if (isProcessing) ({}) else onDismiss,
-        ) {
+    Dialog(
+        onDismissRequest = if (isProcessing) ({}) else onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -184,11 +187,11 @@ private fun SourceButton(
             painter = icon,
             contentDescription = null,
             tint = if (isSelected) NothingWhite else NothingWhite.copy(0.5f),
-            modifier = Modifier.size(32.dp))
+            modifier = Modifier.size(52.dp))
         Spacer(Modifier.height(8.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = if (isSelected) NothingWhite else NothingWhite.copy(0.5f)
         )
     }

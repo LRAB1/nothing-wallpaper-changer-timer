@@ -7,11 +7,13 @@ import androidx.lifecycle.viewModelScope
 import com.ninecsdev.wallpaperchanger.data.WallpaperRepository
 import com.ninecsdev.wallpaperchanger.logic.ImageInternalizer
 import com.ninecsdev.wallpaperchanger.model.CropRule
+import com.ninecsdev.wallpaperchanger.model.ServiceState
 import com.ninecsdev.wallpaperchanger.model.WallpaperCollection
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -24,7 +26,7 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
     private val repository = WallpaperRepository
     private val context = application.applicationContext
 
-    // ── Internal mutable state slices ────────────────────────────────────
+    // Internal mutable state
 
     private var pendingFolderUri: Uri? = null
     private var pendingPhotosUris: List<Uri> = emptyList()
@@ -32,18 +34,20 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
     /** Preview thumbnails loaded on-demand for visible grid items. */
     private val _previewStates = MutableStateFlow<Map<Long, CollectionPreviewState>>(emptyMap())
 
-    /** Modal / processing state managed by this screen. */
+    /** Modal/processing state managed by this screen. */
     private val _screenState = MutableStateFlow(ScreenModalState())
 
     /** Combined public state built reactively. */
     val uiState: StateFlow<CollectionUiState> = combine(
         repository.getAllCollections(),
         _previewStates,
-        _screenState
-    ) { collections, previews, modal ->
+        _screenState,
+        repository.serviceEvent.onStart { emit(Unit) }
+    ) { collections, previews, modal, _ ->
         CollectionUiState(
             allCollections = collections,
             previewStates = previews,
+            serviceState = repository.getServiceState(),
             isPickerMode = modal.isPickerMode,
             isShowingCreateModal = modal.isShowingCreateModal,
             editingCollection = modal.editingCollection,
@@ -55,7 +59,7 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
         initialValue = CollectionUiState()
     )
 
-    // ── Pending source selection (folder / photos) ───────────────────────
+    // Pending source selection
 
     fun setPendingFolderUri(uri: Uri) {
         pendingFolderUri = uri
@@ -70,7 +74,7 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
     fun hasPendingFolder(): Boolean = pendingFolderUri != null
     fun hasPendingPhotos(): Boolean = pendingPhotosUris.isNotEmpty()
 
-    // ── Collection CRUD ──────────────────────────────────────────────────
+    // Collection CRUD
 
     fun finalizeFolderCollection(name: String, rule: CropRule, onComplete: () -> Unit) {
         val uri = pendingFolderUri ?: return
@@ -117,7 +121,7 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    // ── Preview loading (Fix #1 — no @Composable) ───────────────────────
+    // Preview loading
 
     /**
      * Loads the 2×2 thumbnail previews for a collection.
@@ -137,7 +141,7 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    // ── Modal / navigation helpers ───────────────────────────────────────
+    // Modal/navigation helpers
 
     fun setPickerMode(picker: Boolean) {
         _screenState.update { it.copy(isPickerMode = picker) }

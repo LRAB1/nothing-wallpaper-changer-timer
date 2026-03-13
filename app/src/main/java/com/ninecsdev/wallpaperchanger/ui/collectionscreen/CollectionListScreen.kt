@@ -8,12 +8,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -32,7 +34,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ninecsdev.wallpaperchanger.model.CollectionType
+import com.ninecsdev.wallpaperchanger.model.ServiceState
 import com.ninecsdev.wallpaperchanger.model.WallpaperCollection
+import com.ninecsdev.wallpaperchanger.ui.components.StatusLed
+import com.ninecsdev.wallpaperchanger.ui.mainscreen.getVisualsForState
 import com.ninecsdev.wallpaperchanger.ui.theme.NothingBlack
 import com.ninecsdev.wallpaperchanger.ui.theme.NothingWhite
 
@@ -68,6 +73,25 @@ fun CollectionListScreen(
                             tint = NothingWhite
                         )
                     }
+                },
+                actions = {
+                    val (ledColor, _) = getVisualsForState(uiState.serviceState)
+                    StatusLed(
+                        color = ledColor,
+                        isPulsing = uiState.serviceState is ServiceState.Loading,
+                        modifier = Modifier.padding(end = 16.dp)
+                    )
+                    /* TODO: Wire settings icon an uncomment when the screen is ready
+                    IconButton(
+                        onClick = {  },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Settings,
+                            contentDescription = "Collections",
+                            modifier = Modifier.size(32.dp),
+                            tint = NothingWhite
+                        )
+                    }*/
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = NothingBlack,
