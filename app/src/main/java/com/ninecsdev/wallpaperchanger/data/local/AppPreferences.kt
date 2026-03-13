@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import androidx.core.content.edit
 import androidx.core.net.toUri
+import com.ninecsdev.wallpaperchanger.model.RotationTrigger
+import com.ninecsdev.wallpaperchanger.model.TimerInterval
 
 /**
  * Manages simple key-value pairs for global application settings.
@@ -19,6 +21,8 @@ object AppPreferences {
     private const val KEY_REVERT_TO_DEFAULT = "revert_to_default_on_stop"
     private const val KEY_SERVICE_RUNNING = "service_running"
     private const val KEY_START_ON_BOOT = "start_on_boot"
+    private const val KEY_ROTATION_TRIGGER = "rotation_trigger"
+    private const val KEY_TIMER_INTERVAL = "timer_interval"
 
     private fun getPrefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -65,5 +69,30 @@ object AppPreferences {
 
     fun shouldStartOnBoot(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_START_ON_BOOT, true)
+    }
+
+    // Timer / Rotation Trigger Settings
+    fun setRotationTrigger(context: Context, trigger: RotationTrigger) {
+        getPrefs(context).edit {
+            putString(KEY_ROTATION_TRIGGER, trigger.name)
+        }
+    }
+
+    fun getRotationTrigger(context: Context): RotationTrigger {
+        val name = getPrefs(context).getString(KEY_ROTATION_TRIGGER, null)
+        return name?.let { runCatching { RotationTrigger.valueOf(it) }.getOrNull() }
+            ?: RotationTrigger.ON_LOCK
+    }
+
+    fun setTimerInterval(context: Context, interval: TimerInterval) {
+        getPrefs(context).edit {
+            putString(KEY_TIMER_INTERVAL, interval.name)
+        }
+    }
+
+    fun getTimerInterval(context: Context): TimerInterval {
+        val name = getPrefs(context).getString(KEY_TIMER_INTERVAL, null)
+        return name?.let { runCatching { TimerInterval.valueOf(it) }.getOrNull() }
+            ?: TimerInterval.DAILY
     }
 }

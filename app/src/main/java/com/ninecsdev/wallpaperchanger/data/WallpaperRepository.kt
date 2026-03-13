@@ -12,7 +12,9 @@ import com.ninecsdev.wallpaperchanger.logic.BufferManager
 import com.ninecsdev.wallpaperchanger.logic.ImageInternalizer
 import com.ninecsdev.wallpaperchanger.model.CollectionType
 import com.ninecsdev.wallpaperchanger.model.CropRule
+import com.ninecsdev.wallpaperchanger.model.RotationTrigger
 import com.ninecsdev.wallpaperchanger.model.ServiceState
+import com.ninecsdev.wallpaperchanger.model.TimerInterval
 import com.ninecsdev.wallpaperchanger.model.WallpaperCollection
 import com.ninecsdev.wallpaperchanger.model.WallpaperConfig
 import com.ninecsdev.wallpaperchanger.model.WallpaperImage
@@ -312,7 +314,9 @@ object WallpaperRepository {
     fun getWallpaperConfig(): WallpaperConfig {
         return WallpaperConfig(
             defaultWallpaperUri = AppPreferences.getDefaultWallpaperUri(appContext),
-            revertToDefaultOnStop = AppPreferences.shouldRevertToDefault(appContext)
+            revertToDefaultOnStop = AppPreferences.shouldRevertToDefault(appContext),
+            rotationTrigger = AppPreferences.getRotationTrigger(appContext),
+            timerInterval = AppPreferences.getTimerInterval(appContext)
         )
     }
 
@@ -329,6 +333,14 @@ object WallpaperRepository {
     fun isServiceRunning(): Boolean { return AppPreferences.isServiceRunning(appContext) }
     fun shouldStartOnBoot(): Boolean = AppPreferences.shouldStartOnBoot(appContext)
     fun setStartOnBoot(enabled: Boolean) = AppPreferences.setStartOnBoot(appContext, enabled)
+    fun setRotationTrigger(trigger: RotationTrigger) {
+        AppPreferences.setRotationTrigger(appContext, trigger)
+        _configFlow.value = getWallpaperConfig()
+    }
+    fun setTimerInterval(interval: TimerInterval) {
+        AppPreferences.setTimerInterval(appContext, interval)
+        _configFlow.value = getWallpaperConfig()
+    }
 
     // File System Utilities
     // TODO: Move the file system utility to a separate class in the future.

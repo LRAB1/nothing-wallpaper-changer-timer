@@ -6,7 +6,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ninecsdev.wallpaperchanger.data.WallpaperRepository
 import com.ninecsdev.wallpaperchanger.logic.ImageInternalizer
+import com.ninecsdev.wallpaperchanger.model.RotationTrigger
 import com.ninecsdev.wallpaperchanger.model.ServiceState
+import com.ninecsdev.wallpaperchanger.model.TimerInterval
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -90,6 +92,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setRevertToDefault(isChecked: Boolean) {
         repository.setRevertToDefault(isChecked)
+    }
+
+    fun setRotationTrigger(trigger: RotationTrigger) {
+        repository.setRotationTrigger(trigger)
+    }
+
+    fun setTimerInterval(interval: TimerInterval) {
+        repository.setTimerInterval(interval)
     }
 
     fun internalizeAndSaveDefaultWallpaper(uri: Uri) {
