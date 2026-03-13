@@ -1,6 +1,7 @@
 package com.ninecsdev.wallpaperchanger.data
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.DocumentsContract
@@ -14,7 +15,6 @@ import com.ninecsdev.wallpaperchanger.model.CollectionType
 import com.ninecsdev.wallpaperchanger.model.CropRule
 import com.ninecsdev.wallpaperchanger.model.ServiceState
 import com.ninecsdev.wallpaperchanger.model.WallpaperCollection
-import com.ninecsdev.wallpaperchanger.model.WallpaperConfig
 import com.ninecsdev.wallpaperchanger.model.WallpaperImage
 import com.ninecsdev.wallpaperchanger.service.WallpaperService
 import kotlinx.coroutines.Dispatchers
@@ -40,14 +40,23 @@ object WallpaperRepository {
     private val _serviceEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val serviceEvent: SharedFlow<Unit> = _serviceEvent.asSharedFlow()
 
-    private val _configFlow = MutableStateFlow(WallpaperConfig())
-    val configFlow: StateFlow<WallpaperConfig> = _configFlow.asStateFlow()
+    private val _serviceStateFlow = MutableStateFlow<ServiceState>(ServiceState.Stopped)
+    val serviceStateFlow: StateFlow<ServiceState> = _serviceStateFlow.asStateFlow()
+
+    private val _defaultWallpaperUriFlow = MutableStateFlow<Uri?>(null)
+    val defaultWallpaperUriFlow: StateFlow<Uri?> = _defaultWallpaperUriFlow.asStateFlow()
+
+    private val _revertToDefaultFlow = MutableStateFlow(true)
+    val revertToDefaultFlow: StateFlow<Boolean> = _revertToDefaultFlow.asStateFlow()
 
     fun initialize(context: Context) {
         if (!::appContext.isInitialized) {
             appContext = context.applicationContext
             dao = AppDatabase.getDatabase(appContext).wallpaperDao()
-            _configFlow.value = getWallpaperConfig()
+
+            _defaultWallpaperUriFlow.value = AppPreferences.getDefaultWallpaperUri(appContext)
+            _revertToDefaultFlow.value = AppPreferences.shouldRevertToDefault(appContext)
+            _serviceStateFlow.value = ServiceState.Stopped
         }
     }
 
@@ -161,18 +170,27 @@ object WallpaperRepository {
         withContext(Dispatchers.IO) {
             if (collection.isActive) {
                 clearMagazine()
-                AppPreferences.setServiceRunning(appContext, false)
+                markServiceStopped()
             }
 
-            // Clean up internal files for all images in the collection
+            // Clean up internal files for all images in the manual collection
             val images = dao.getImagesForCollectionOnce(collection.id)
             images.forEach { image ->
-                // Delete internalized source files (manual collections)
                 if (collection.type == CollectionType.MANUAL) {
                     ImageInternalizer.deleteInternalFile(image.uri.path)
                 }
-                // Delete edited file if one exists
                 ImageInternalizer.deleteInternalFile(image.editedUri?.path)
+            }
+
+            // Release the persisted folder permission if this is a folder collection
+            if (collection.type == CollectionType.FOLDER && collection.rootUri != null) {
+                try {
+                    appContext.contentResolver.releasePersistableUriPermission(
+                        collection.rootUri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (e: SecurityException) {
+                    Log.w(TAG, "Permission already released for: ${collection.rootUri}", e)
+                }
             }
 
             dao.deleteCollection(collection)
@@ -234,38 +252,57 @@ object WallpaperRepository {
     /**
      * Processes the next wallpapers while only showing each once before shuffling.
      * It self-heals if an image fails to load.
+     * Uses an iterative approach to avoid stack overflow from recursion.
      */
-    suspend fun refillDiskBuffer(): Boolean {
-        return withContext(Dispatchers.IO) {
-            if (imageMagazine.isEmpty()) loadMagazine()
+    suspend fun refillDiskBuffer(): Boolean = withContext(Dispatchers.IO) {
+        if (imageMagazine.isEmpty()) loadMagazine()
 
-            val activeCollection = getActiveCollectionOnce() ?: return@withContext false
+        val activeCollection = getActiveCollectionOnce() ?: return@withContext false
+        var result: Boolean? = null
 
+        while (result == null) {
             val nextImage = synchronized(imageMagazine) {
-                if (imageMagazine.isEmpty()) return@withContext false
+                if (imageMagazine.isEmpty()) {
+                    result = false
+                    null
+                } else {
+                    currentPointer++
 
-                currentPointer++
+                    if (currentPointer >= imageMagazine.size) {
+                        Log.d(TAG, "Cycle complete. Reshuffling for new sequence.")
+                        imageMagazine.shuffle()
+                        currentPointer = 0
+                    }
 
-                if (currentPointer >= imageMagazine.size) {
-                    Log.d(TAG, "Cycle complete. Reshuffling for new sequence.")
-                    imageMagazine.shuffle()
-                    currentPointer = 0
+                    imageMagazine[currentPointer]
                 }
+            } ?: continue
 
-                imageMagazine[currentPointer]
+            val success = BufferManager.prepareNextWallpaper(
+                nextImage,
+                activeCollection.defaultCropRule
+            )
+
+            if (success) {
+                result = true
+                continue
             }
 
-            val success = BufferManager.prepareNextWallpaper(nextImage,activeCollection.defaultCropRule )
+            Log.w(TAG, "Failed to load ${nextImage.uri}. Removing from rotation.")
+            ImageInternalizer.deleteInternalFile(nextImage.editedUri?.path)
+            dao.deleteImageById(nextImage.id)
 
-            if (!success) {
-                Log.w(TAG, "Failed to load ${nextImage.uri}. Removing from rotation.")
-                ImageInternalizer.deleteInternalFile(nextImage.editedUri?.path)
-                dao.deleteImageById(nextImage.id)
-                synchronized(imageMagazine) { imageMagazine.remove(nextImage) }
-                return@withContext refillDiskBuffer()
+            synchronized(imageMagazine) {
+                imageMagazine.remove(nextImage)
+                if (imageMagazine.isEmpty()) {
+                    currentPointer = -1
+                } else if (currentPointer >= imageMagazine.size) {
+                    currentPointer = imageMagazine.lastIndex
+                }
             }
-            true
         }
+
+        result ?: false
     }
 
     /**
@@ -280,52 +317,74 @@ object WallpaperRepository {
 
     // Service status & Preferences
 
-    private var isStartingUp = false
-
-    fun setStartingUp(loading: Boolean) {
-        isStartingUp = loading
+    private fun updateServiceState(state: ServiceState) {
+        if (_serviceStateFlow.value != state) {
+            _serviceStateFlow.value = state
+        }
+        notifyServiceStateChanged()
     }
 
-    private var isPausedBySystem = false
+    fun markServiceLoading() {
+        updateServiceState(ServiceState.Loading)
+    }
 
-    fun setServicePaused(paused: Boolean) {
-        isPausedBySystem = paused
+    fun markServiceRunning() {
+        AppPreferences.setServiceRunning(appContext, true)
+        updateServiceState(ServiceState.Running)
+    }
+
+    fun markServicePaused() {
+        AppPreferences.setServiceRunning(appContext, true)
+        updateServiceState(ServiceState.Paused)
+    }
+
+    fun markServiceStopped() {
+        AppPreferences.setServiceRunning(appContext, false)
+        updateServiceState(ServiceState.Stopped)
     }
 
     suspend fun getServiceState(): ServiceState {
         val powerManager = appContext.getSystemService(Context.POWER_SERVICE) as? PowerManager
         val isPowerSave = powerManager?.isPowerSaveMode ?: false
-        val isRunning = AppPreferences.isServiceRunning(appContext)
         val activeCollection = getActiveCollectionOnce()
+        val currentState = _serviceStateFlow.value
 
         return when {
             activeCollection == null -> ServiceState.DisabledNoCollection
-            isStartingUp -> ServiceState.Loading
-            isRunning && isPausedBySystem -> ServiceState.Paused
-            isRunning && WallpaperService.isAlive -> ServiceState.Running
-            isRunning -> ServiceState.Stopped // Service died (e.g. killed by OEM, reboot failed)
+            currentState is ServiceState.Loading -> ServiceState.Loading
+            currentState is ServiceState.Paused -> ServiceState.Paused
+            AppPreferences.isServiceRunning(appContext) && WallpaperService.isAlive -> ServiceState.Running
+            AppPreferences.isServiceRunning(appContext) -> {
+                markServiceStopped()
+                ServiceState.Stopped
+            }
             isPowerSave -> ServiceState.DisabledPowerSave
             else -> ServiceState.Stopped
         }
     }
 
-    fun getWallpaperConfig(): WallpaperConfig {
-        return WallpaperConfig(
-            defaultWallpaperUri = AppPreferences.getDefaultWallpaperUri(appContext),
-            revertToDefaultOnStop = AppPreferences.shouldRevertToDefault(appContext)
-        )
-    }
+    fun getDefaultWallpaperUri(): Uri? = AppPreferences.getDefaultWallpaperUri(appContext)
+    fun shouldRevertToDefault(): Boolean = AppPreferences.shouldRevertToDefault(appContext)
 
     // Passthroughs to Preferences
     fun setRevertToDefault(revert: Boolean) {
         AppPreferences.setRevertToDefault(appContext, revert)
-        _configFlow.value = getWallpaperConfig()
+        _revertToDefaultFlow.value = revert
     }
+
     fun saveDefaultWallpaperUri(uri: Uri) {
         AppPreferences.saveDefaultWallpaperUri(appContext, uri)
-        _configFlow.value = getWallpaperConfig()
+        _defaultWallpaperUriFlow.value = uri
     }
-    fun setServiceRunning(isRunning: Boolean) = AppPreferences.setServiceRunning(appContext, isRunning)
+
+    fun setServiceRunning(isRunning: Boolean) {
+        if (isRunning) {
+            markServiceRunning()
+        } else {
+            markServiceStopped()
+        }
+    }
+
     fun isServiceRunning(): Boolean { return AppPreferences.isServiceRunning(appContext) }
     fun shouldStartOnBoot(): Boolean = AppPreferences.shouldStartOnBoot(appContext)
     fun setStartOnBoot(enabled: Boolean) = AppPreferences.setStartOnBoot(appContext, enabled)

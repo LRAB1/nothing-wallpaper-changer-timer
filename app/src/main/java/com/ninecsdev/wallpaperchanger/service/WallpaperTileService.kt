@@ -93,7 +93,7 @@ class WallpaperTileService : TileService() {
                     updateTile()
                 }
                 is ServiceState.Stopped -> {
-                    repository.setStartingUp(true)
+                    repository.markServiceLoading()
                     updateTile()
                     val intent = Intent(this@WallpaperTileService, WallpaperService::class.java)
                     startForegroundService(intent)

@@ -38,45 +38,38 @@ class WallpaperService : Service() {
 
     private var screenOffReceiver: BroadcastReceiver? = null
     private var systemEventReceiver: BroadcastReceiver? = null
-    private var isPaused = false
-
     // SupervisorJob ensures one failing task doesn't kill the whole service scope
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-    /**
-     * The companion object holds static members and methods for the service.
-     * It is responsible of applying the default wallpaper when the service is stopped.
-     */
     companion object {
         const val ACTION_STOP_SERVICE = "com.ninecsdev.wallpaperchanger.ACTION_STOP_SERVICE"
 
         /** In-memory flag that resets on process death (reboots). */
         @Volatile var isAlive = false
             private set
+    }
 
-        suspend fun applyDefaultWallpaper(context: Context) {
-            val config = WallpaperRepository.getWallpaperConfig()
-            val uri = config.defaultWallpaperUri ?: return
+    private suspend fun applyDefaultWallpaper() {
+        val uri = WallpaperRepository.getDefaultWallpaperUri() ?: return
 
-            Log.d("WallpaperService", "Applying default wallpaper...")
+        Log.d(tag, "Applying default wallpaper...")
 
-            withContext(Dispatchers.IO) {
-                try {
-                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                        val bitmap = BitmapFactory.decodeStream(stream)
-                        if (bitmap != null) {
-                            WallpaperManager.getInstance(context).setBitmap(
-                                bitmap,
-                                null,
-                                true,
-                                WallpaperManager.FLAG_LOCK
-                            )
-                            Log.i("WallpaperService", "Successfully applied default wallpaper.")
-                        }
+        withContext(Dispatchers.IO) {
+            try {
+                contentResolver.openInputStream(uri)?.use { stream ->
+                    val bitmap = BitmapFactory.decodeStream(stream)
+                    if (bitmap != null) {
+                        WallpaperManager.getInstance(this@WallpaperService).setBitmap(
+                            bitmap,
+                            null,
+                            true,
+                            WallpaperManager.FLAG_LOCK
+                        )
+                        Log.i(tag, "Successfully applied default wallpaper.")
                     }
-                } catch (e: Exception) {
-                    Log.e("WallpaperService", "Fallback failed", e)
                 }
+            } catch (e: Exception) {
+                Log.e(tag, "Fallback failed", e)
             }
         }
     }
@@ -135,8 +128,8 @@ class WallpaperService : Service() {
         }
 
         serviceScope.launch {
-            WallpaperRepository.setStartingUp(true)
-            notifyUiStarted()
+            WallpaperRepository.markServiceLoading()
+            notifyUi()
 
             val state = WallpaperRepository.getServiceState()
 
@@ -144,15 +137,14 @@ class WallpaperService : Service() {
                 WallpaperRepository.loadMagazine()
                 WallpaperRepository.refillDiskBuffer()
 
-                WallpaperRepository.setServiceRunning(true)
-                WallpaperRepository.setStartingUp(false)
-                notifyUiStarted()
+                WallpaperRepository.markServiceRunning()
+                notifyUi()
 
                 val activeName = WallpaperRepository.getActiveCollectionOnce()?.name ?: "ACTIVE"
                 updateNotification("Cycling: $activeName")
             }else{
                 Log.w(tag, "Abort startup: No collection found.")
-                WallpaperRepository.setStartingUp(false)
+                WallpaperRepository.markServiceStopped()
                 handleStopCommand()
             }
         }
@@ -162,15 +154,12 @@ class WallpaperService : Service() {
 
     private fun handleStopCommand() {
         Log.i(tag, "Stopping service via command.")
-        WallpaperRepository.setServiceRunning(false)
-        WallpaperRepository.setServicePaused(false)
-        isPaused = false
-        notifyUiStopped()
+        WallpaperRepository.markServiceStopped()
+        notifyUi()
 
         serviceScope.launch {
-            val config = WallpaperRepository.getWallpaperConfig()
-            if (config.revertToDefaultOnStop) {
-                applyDefaultWallpaper(applicationContext)
+            if (WallpaperRepository.shouldRevertToDefault()) {
+                applyDefaultWallpaper()
             }
             stopSelf()
         }
@@ -181,10 +170,9 @@ class WallpaperService : Service() {
      * The foreground service stays alive so it can auto-resume.
      */
     private fun pauseEngine() {
-        if (isPaused) return
+        if (WallpaperRepository.serviceStateFlow.value is ServiceState.Paused) return
         Log.i(tag, "Pausing engine (Power Save ON)")
-        isPaused = true
-        WallpaperRepository.setServicePaused(true)
+        WallpaperRepository.markServicePaused()
 
         screenOffReceiver?.let {
             unregisterReceiver(it)
@@ -192,24 +180,22 @@ class WallpaperService : Service() {
         }
 
         serviceScope.launch {
-            val config = WallpaperRepository.getWallpaperConfig()
-            if (config.revertToDefaultOnStop) {
-                applyDefaultWallpaper(applicationContext)
+            if (WallpaperRepository.shouldRevertToDefault()) {
+                applyDefaultWallpaper()
             }
         }
 
         updateNotification("Paused (Power Save)")
-        notifyUiStarted()
+        notifyUi()
     }
 
     /**
      * Resumes the wallpaper changing by re-registering the ScreenOffReceiver.
      */
     private fun resumeEngine() {
-        if (!isPaused) return
+        if (WallpaperRepository.serviceStateFlow.value !is ServiceState.Paused) return
         Log.i(tag, "Resuming engine (Power Save OFF)")
-        isPaused = false
-        WallpaperRepository.setServicePaused(false)
+        WallpaperRepository.markServiceRunning()
 
         screenOffReceiver = ScreenOffReceiver()
         registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), RECEIVER_EXPORTED)
@@ -218,7 +204,7 @@ class WallpaperService : Service() {
             val activeName = WallpaperRepository.getActiveCollectionOnce()?.name ?: "ACTIVE"
             updateNotification("Cycling: $activeName")
         }
-        notifyUiStarted()
+        notifyUi()
     }
 
     override fun onDestroy() {
@@ -234,8 +220,7 @@ class WallpaperService : Service() {
         stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
-    private fun notifyUiStarted() = WallpaperRepository.notifyServiceStateChanged()
-    private fun notifyUiStopped() = WallpaperRepository.notifyServiceStateChanged()
+    private fun notifyUi() = WallpaperRepository.notifyServiceStateChanged()
 
     // Notification management TODO: Move to separate class in the future.
 

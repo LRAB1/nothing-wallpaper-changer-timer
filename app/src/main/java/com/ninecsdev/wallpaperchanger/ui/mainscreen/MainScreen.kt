@@ -30,7 +30,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.ninecsdev.wallpaperchanger.R
 import com.ninecsdev.wallpaperchanger.model.ServiceState
-import com.ninecsdev.wallpaperchanger.model.WallpaperConfig
 import com.ninecsdev.wallpaperchanger.ui.theme.NothingBlack
 import com.ninecsdev.wallpaperchanger.ui.theme.NothingWhite
 
@@ -127,8 +126,8 @@ fun MainScreenContent(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 DefaultWallpaperCard(
-                    revertToDefault = uiState.config.revertToDefaultOnStop,
-                    defaultUri = uiState.config.defaultWallpaperUri,
+                    revertToDefault = uiState.revertToDefaultOnStop,
+                    defaultUri = uiState.defaultWallpaperUri,
                     onToggleRevert = onToggleRevert,
                     onSelectDefaultClick = onSelectDefaultClick
                 )
@@ -160,7 +159,7 @@ fun MainScreenRunningPreview() {
             MainScreenContent(
                 uiState = MainUiState(
                     serviceState = ServiceState.Running,
-                    config = WallpaperConfig(revertToDefaultOnStop = true)
+                    revertToDefaultOnStop = true
                 ),
                 onStartClick = {},
                 onStopClick = {},

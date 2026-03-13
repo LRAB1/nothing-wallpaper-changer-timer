@@ -6,7 +6,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ninecsdev.wallpaperchanger.data.WallpaperRepository
 import com.ninecsdev.wallpaperchanger.logic.ImageInternalizer
-import com.ninecsdev.wallpaperchanger.model.ServiceState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,12 +16,19 @@ import kotlinx.coroutines.launch
 
 /**
  * ViewModel for the Main Dashboard screen.
- * Builds [MainUiState] reactively by combining three independent flows:
+ * Builds [MainUiState] reactively by combining independent flows:
  *   1. Collections (Room) - active collection + previews
- *   2. Service events - service state changes
- *   3. Config flow - user preferences
+ *   2. Default wallpaper URI preference
+ *   3. Revert-on-stop preference
+ *   4. Service events - service state changes
  */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
+
+    private data class UiInputs(
+        val collections: List<com.ninecsdev.wallpaperchanger.model.WallpaperCollection>,
+        val defaultWallpaperUri: Uri?,
+        val revertToDefaultOnStop: Boolean
+    )
 
     private val repository = WallpaperRepository
 
@@ -36,38 +42,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Lightweight navigation flag — only field the VM mutates directly. */
     private val _showLists = MutableStateFlow(false)
 
-    val uiState: StateFlow<MainUiState> = combine(
+    private val uiInputs = combine(
         repository.getAllCollections(),
-        repository.configFlow,
+        repository.defaultWallpaperUriFlow,
+        repository.revertToDefaultFlow,
         repository.serviceEvent.onStart { emit(Unit) },
-        _serviceRefresh,
+        _serviceRefresh
+    ) { collections, defaultWallpaperUri, revertToDefaultOnStop, _, _ ->
+        UiInputs(
+            collections = collections,
+            defaultWallpaperUri = defaultWallpaperUri,
+            revertToDefaultOnStop = revertToDefaultOnStop
+        )
+    }
+
+    val uiState: StateFlow<MainUiState> = combine(
+        uiInputs,
         _showLists
-    ) { collections, config, _, _, showLists ->
+    ) { inputs, showLists ->
+
+        val collections = inputs.collections
+        val defaultWallpaperUri = inputs.defaultWallpaperUri
+        val revertToDefaultOnStop = inputs.revertToDefaultOnStop
 
         val active = collections.find { it.isActive }
-
-        // Self-healing: if SharedPrefs says "running" but service is dead, fix it
-        val serviceState = repository.getServiceState().let { state ->
-            if (repository.isServiceRunning() && state is ServiceState.Stopped) {
-                repository.setServiceRunning(false)
-                repository.getServiceState()
-            } else {
-                state
-            }
-        }
-
         val previews = if (active != null) {
             repository.getImagesForCollectionOnce(active.id)
         } else {
             emptyList()
         }
-
+        
         MainUiState(
-            serviceState = serviceState,
+            serviceState = repository.getServiceState(),
             activeCollection = active,
             previewImages = previews.take(3),
             activeCollectionSize = previews.size,
-            config = config,
+            defaultWallpaperUri = defaultWallpaperUri,
+            revertToDefaultOnStop = revertToDefaultOnStop,
             isShowingLists = showLists
         )
     }.stateIn(
@@ -94,7 +105,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun internalizeAndSaveDefaultWallpaper(uri: Uri) {
         viewModelScope.launch {
-            val previousUri = repository.getWallpaperConfig().defaultWallpaperUri
+            val previousUri = repository.getDefaultWallpaperUri()
             if (previousUri != null) ImageInternalizer.deleteInternalFile(previousUri.path)
             val internalized = ImageInternalizer.internalizeImages(getApplication(), listOf(uri))
             internalized.firstOrNull()?.let { repository.saveDefaultWallpaperUri(it) }

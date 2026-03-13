@@ -1,8 +1,8 @@
 package com.ninecsdev.wallpaperchanger.ui.mainscreen
 
+import android.net.Uri
 import com.ninecsdev.wallpaperchanger.model.ServiceState
 import com.ninecsdev.wallpaperchanger.model.WallpaperCollection
-import com.ninecsdev.wallpaperchanger.model.WallpaperConfig
 import com.ninecsdev.wallpaperchanger.model.WallpaperImage
 
 /**
@@ -19,7 +19,8 @@ data class MainUiState(
     val activeCollectionSize: Int = 0,
 
     // Default wallpaper data
-    val config: WallpaperConfig = WallpaperConfig(),
+    val defaultWallpaperUri: Uri? = null,
+    val revertToDefaultOnStop: Boolean = true,
 
     // Top-level navigation (will be overhauled with Jetpack Navigation)
     val isShowingLists: Boolean = false
