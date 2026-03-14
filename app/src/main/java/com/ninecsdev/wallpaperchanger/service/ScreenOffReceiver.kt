@@ -8,6 +8,7 @@ import android.os.PowerManager
 import android.util.Log
 import com.ninecsdev.wallpaperchanger.data.WallpaperRepository
 import com.ninecsdev.wallpaperchanger.logic.BufferManager
+import com.ninecsdev.wallpaperchanger.model.RotationFrequency
 import com.ninecsdev.wallpaperchanger.model.shouldRotateAt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -53,7 +54,12 @@ class ScreenOffReceiver : BroadcastReceiver() {
                 }
 
                 if (!activeCollection.shouldRotateAt()) {
-                    Log.d(tag, "Rotation skipped. Timer for ${activeCollection.rotationFrequency} not met yet.")
+                    val frequencyLabel = when (activeCollection.rotationFrequency) {
+                        RotationFrequency.PER_LOCK -> "per lock"
+                        RotationFrequency.HOURLY -> "hourly"
+                        RotationFrequency.PER_DAY -> "daily"
+                    }
+                    Log.d(tag, "Rotation skipped. Timer for $frequencyLabel not met yet.")
                     return@launch
                 }
 

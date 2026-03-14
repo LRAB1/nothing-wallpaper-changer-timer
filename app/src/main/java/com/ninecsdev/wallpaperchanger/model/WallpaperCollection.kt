@@ -59,7 +59,7 @@ fun WallpaperCollection.shouldRotateAt(
 
             val lastChangeDate = Instant.ofEpochMilli(lastWallpaperChangeAt).atZone(zoneId).toLocalDate()
             val nowDate = Instant.ofEpochMilli(nowMillis).atZone(zoneId).toLocalDate()
-            lastChangeDate != nowDate
+            nowDate.isAfter(lastChangeDate)
         }
     }
 }

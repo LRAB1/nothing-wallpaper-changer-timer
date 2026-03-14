@@ -148,7 +148,7 @@ private fun RotationFrequencySelector(
     onFrequencySelected: (RotationFrequency) -> Unit
 ) {
     Text(
-        text = "ROTATION TIMER",
+        text = "ROTATION FREQUENCY",
         style = MaterialTheme.typography.labelSmall,
         color = NothingWhite.copy(alpha = 0.7f),
         letterSpacing = 1.sp,
