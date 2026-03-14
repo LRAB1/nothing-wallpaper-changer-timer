@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.room.TypeConverter
 import com.ninecsdev.wallpaperchanger.model.CollectionType
 import com.ninecsdev.wallpaperchanger.model.CropRule
+import com.ninecsdev.wallpaperchanger.model.RotationFrequency
 
 /**
  * Type converters for Room Database.
@@ -42,5 +43,18 @@ class Converters {
         } catch (e: IllegalArgumentException) {
             Log.e("Converters", "Invalid CropRule: $value", e)
             CropRule.CENTER
+        }
+
+    // RotationFrequency Converters
+    @TypeConverter
+    fun fromRotationFrequency(frequency: RotationFrequency): String = frequency.name
+
+    @TypeConverter
+    fun toRotationFrequency(value: String): RotationFrequency =
+        try {
+            RotationFrequency.valueOf(value)
+        } catch (e: IllegalArgumentException) {
+            Log.e("Converters", "Invalid RotationFrequency: $value", e)
+            RotationFrequency.PER_LOCK
         }
 }

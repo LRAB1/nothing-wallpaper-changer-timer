@@ -36,6 +36,7 @@ There weren't many solutions on the Play Store and the ones I found were either 
     - **Manual:** Hand-pick individual photos; they're safely copied into the app's private storage so they're always available.
 - **Smart Shuffle:** Every image is shown exactly once before the collection reshuffles in order to never getting any individual wallpaper too often.
 - **Flexible Cropping:** Choose how images fit your screen per collection: center, left-aligned, right-aligned, or fit-to-screen.
+- **Rotation Timer Modes:** Configure each collection to rotate on every lock, every 1 hour, or once per day.
 - **Quick Settings Tile:** Start, stop, or check status right from the notification shade letting you control it while doing something else.
 - **Default Wallpaper Fallback:** Pick a fallback lock screen image that's automatically restored when the service stops or pauses.
 - **Survives Reboots:** If the service was running before a restart, it picks right back up.

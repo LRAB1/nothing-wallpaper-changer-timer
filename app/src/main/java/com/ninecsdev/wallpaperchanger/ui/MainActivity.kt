@@ -179,11 +179,12 @@ class MainActivity : ComponentActivity() {
                                 collection = collection,
                                 isProcessing = collectionState.isProcessing,
                                 onDismiss = { collectionViewModel.closeEditModal() },
-                                onEdit = { newName, newRule ->
+                                onEdit = { newName, newRule, newFrequency ->
                                     collectionViewModel.updateCollection(
                                         collection.id,
                                         newName,
-                                        newRule
+                                        newRule,
+                                        newFrequency
                                     )
                                 },
                                 onSetActive = { mainViewModel.setActiveCollection(collection.id) },
