@@ -8,6 +8,7 @@ import android.os.PowerManager
 import android.util.Log
 import com.ninecsdev.wallpaperchanger.data.WallpaperRepository
 import com.ninecsdev.wallpaperchanger.logic.BufferManager
+import com.ninecsdev.wallpaperchanger.model.shouldRotateAt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -45,9 +46,23 @@ class ScreenOffReceiver : BroadcastReceiver() {
                     return@launch
                 }
 
+                val activeCollection = WallpaperRepository.getActiveCollectionOnce()
+                if (activeCollection == null) {
+                    Log.w(tag, "No active collection found. Skipping wallpaper change.")
+                    return@launch
+                }
+
+                if (!activeCollection.shouldRotateAt()) {
+                    Log.d(tag, "Rotation skipped. Timer for ${activeCollection.rotationFrequency} not met yet.")
+                    return@launch
+                }
+
                 // Apply the pre-processed buffer image and prepare next image
-                applyBufferToLockScreen(context)
-                WallpaperRepository.refillDiskBuffer()
+                val applied = applyBufferToLockScreen(context)
+                if (applied) {
+                    WallpaperRepository.markWallpaperChanged(activeCollection.id)
+                    WallpaperRepository.refillDiskBuffer()
+                }
             } catch (e: Exception) {
                 Log.e(tag, "Error during wallpaper change", e)
             } finally {
@@ -62,13 +77,13 @@ class ScreenOffReceiver : BroadcastReceiver() {
      * This bypasses the Bitmap heap, preventing OutOfMemory errors
      * and instantly changes the wallpaper.
      */
-    private fun applyBufferToLockScreen(context: Context) {
+    private fun applyBufferToLockScreen(context: Context): Boolean {
         try {
             val bufferFile = BufferManager.getBufferFile()
 
             if (!bufferFile.exists()) {
                 Log.w(tag, "Buffer file missing. Is the service initialized?")
-                return
+                return false
             }
 
             bufferFile.inputStream().use { stream ->
@@ -81,9 +96,11 @@ class ScreenOffReceiver : BroadcastReceiver() {
                 )
             }
             Log.i(tag, "Wallpaper applied successfully from disk buffer.")
+            return true
 
         } catch (e: Exception) {
             Log.e(tag, "Failed to stream buffer to lock screen", e)
+            return false
         }
     }
 }

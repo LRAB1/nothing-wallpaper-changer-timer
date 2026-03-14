@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import com.ninecsdev.wallpaperchanger.model.CropRule
+import com.ninecsdev.wallpaperchanger.model.RotationFrequency
 import com.ninecsdev.wallpaperchanger.model.WallpaperCollection
 import com.ninecsdev.wallpaperchanger.model.WallpaperImage
 import kotlinx.coroutines.flow.Flow
@@ -34,8 +35,13 @@ interface WallpaperDao {
     /**
      * Updates the name and default crop rule of a collection.
      */
-    @Query("UPDATE collections SET name = :newName, defaultCropRule = :newRule WHERE id = :collectionId")
-    suspend fun updateCollection(collectionId: Long, newName: String, newRule: CropRule)
+    @Query("UPDATE collections SET name = :newName, defaultCropRule = :newRule, rotationFrequency = :newFrequency WHERE id = :collectionId")
+    suspend fun updateCollection(
+        collectionId: Long,
+        newName: String,
+        newRule: CropRule,
+        newFrequency: RotationFrequency
+    )
 
     @Query("SELECT * FROM collections WHERE isActive = 1 LIMIT 1")
     suspend fun getActiveCollection(): WallpaperCollection?
@@ -58,6 +64,9 @@ interface WallpaperDao {
 
     @Query("UPDATE collections SET lastUsedAt = :timestamp WHERE id = :collectionId")
     suspend fun updateLastUsed(collectionId: Long, timestamp: Long = System.currentTimeMillis())
+
+    @Query("UPDATE collections SET lastWallpaperChangeAt = :timestamp WHERE id = :collectionId")
+    suspend fun updateLastWallpaperChangeAt(collectionId: Long, timestamp: Long = System.currentTimeMillis())
 
     // Wallpaper/Image Operations
     /**
