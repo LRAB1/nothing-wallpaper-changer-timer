@@ -316,7 +316,8 @@ object WallpaperRepository {
             defaultWallpaperUri = AppPreferences.getDefaultWallpaperUri(appContext),
             revertToDefaultOnStop = AppPreferences.shouldRevertToDefault(appContext),
             rotationTrigger = AppPreferences.getRotationTrigger(appContext),
-            timerInterval = AppPreferences.getTimerInterval(appContext)
+            timerInterval = AppPreferences.getTimerInterval(appContext),
+            followFocusMode = AppPreferences.shouldFollowFocusMode(appContext)
         )
     }
 
@@ -339,6 +340,10 @@ object WallpaperRepository {
     }
     fun setTimerInterval(interval: TimerInterval) {
         AppPreferences.setTimerInterval(appContext, interval)
+        _configFlow.value = getWallpaperConfig()
+    }
+    fun setFollowFocusMode(enabled: Boolean) {
+        AppPreferences.setFollowFocusMode(appContext, enabled)
         _configFlow.value = getWallpaperConfig()
     }
 

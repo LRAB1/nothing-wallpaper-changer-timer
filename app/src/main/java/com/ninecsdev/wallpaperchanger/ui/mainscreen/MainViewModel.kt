@@ -102,6 +102,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.setTimerInterval(interval)
     }
 
+    fun setFollowFocusMode(enabled: Boolean) {
+        repository.setFollowFocusMode(enabled)
+    }
+
     fun internalizeAndSaveDefaultWallpaper(uri: Uri) {
         viewModelScope.launch {
             val previousUri = repository.getWallpaperConfig().defaultWallpaperUri

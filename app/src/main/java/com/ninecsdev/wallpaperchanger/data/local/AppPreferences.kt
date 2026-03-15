@@ -23,6 +23,7 @@ object AppPreferences {
     private const val KEY_START_ON_BOOT = "start_on_boot"
     private const val KEY_ROTATION_TRIGGER = "rotation_trigger"
     private const val KEY_TIMER_INTERVAL = "timer_interval"
+    private const val KEY_FOLLOW_FOCUS_MODE = "follow_focus_mode"
 
     private fun getPrefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -94,5 +95,16 @@ object AppPreferences {
         val name = getPrefs(context).getString(KEY_TIMER_INTERVAL, null)
         return name?.let { runCatching { TimerInterval.valueOf(it) }.getOrNull() }
             ?: TimerInterval.DAILY
+    }
+
+    // Follow Focus / DND Mode
+    fun setFollowFocusMode(context: Context, enabled: Boolean) {
+        getPrefs(context).edit {
+            putBoolean(KEY_FOLLOW_FOCUS_MODE, enabled)
+        }
+    }
+
+    fun shouldFollowFocusMode(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_FOLLOW_FOCUS_MODE, false)
     }
 }

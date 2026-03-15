@@ -12,7 +12,8 @@ data class WallpaperConfig(
     val defaultWallpaperUri: Uri? = null,
     val revertToDefaultOnStop: Boolean = true,
     val rotationTrigger: RotationTrigger = RotationTrigger.ON_LOCK,
-    val timerInterval: TimerInterval = TimerInterval.DAILY
+    val timerInterval: TimerInterval = TimerInterval.DAILY,
+    val followFocusMode: Boolean = false
 ) {
     /** Helper to check if a fallback wallpaper has been configured. */
     val hasDefaultWallpaper: Boolean get() = defaultWallpaperUri != null

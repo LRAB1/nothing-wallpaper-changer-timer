@@ -64,6 +64,7 @@ fun MainScreen(
             )
         },
         onIntervalSelected = { viewModel.setTimerInterval(it) },
+        onToggleFollowFocusMode = { viewModel.setFollowFocusMode(it) },
         onStartClick = onStartRequest,
         onStopClick = onStopRequest
     )
@@ -84,7 +85,8 @@ fun MainScreenContent(
     onToggleRevert: (Boolean) -> Unit,
     onSelectDefaultClick: () -> Unit,
     onToggleTimedMode: (Boolean) -> Unit = {},
-    onIntervalSelected: (TimerInterval) -> Unit = {}
+    onIntervalSelected: (TimerInterval) -> Unit = {},
+    onToggleFollowFocusMode: (Boolean) -> Unit = {}
 ) {
     Scaffold(
         containerColor = NothingBlack,
@@ -149,8 +151,10 @@ fun MainScreenContent(
                 TimerSettingsCard(
                     rotationTrigger = uiState.config.rotationTrigger,
                     timerInterval = uiState.config.timerInterval,
+                    followFocusMode = uiState.config.followFocusMode,
                     onToggleTimedMode = onToggleTimedMode,
-                    onIntervalSelected = onIntervalSelected
+                    onIntervalSelected = onIntervalSelected,
+                    onToggleFollowFocusMode = onToggleFollowFocusMode
                 )
 
                 // Extra bottom padding so the last card clears the floating Start/Stop button

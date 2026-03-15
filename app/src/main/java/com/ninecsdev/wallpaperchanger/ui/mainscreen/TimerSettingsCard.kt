@@ -42,13 +42,16 @@ import com.ninecsdev.wallpaperchanger.ui.theme.NothingWhite
 /**
  * Card for configuring the wallpaper rotation trigger (per-lock vs. timed).
  * When timed mode is enabled, a dropdown lets the user pick the interval.
+ * Also contains the "Follow focus mode" opt-in toggle.
  */
 @Composable
 fun TimerSettingsCard(
     rotationTrigger: RotationTrigger,
     timerInterval: TimerInterval,
+    followFocusMode: Boolean,
     onToggleTimedMode: (Boolean) -> Unit,
-    onIntervalSelected: (TimerInterval) -> Unit
+    onIntervalSelected: (TimerInterval) -> Unit,
+    onToggleFollowFocusMode: (Boolean) -> Unit
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -75,6 +78,15 @@ fun TimerSettingsCard(
                     onSelected = onIntervalSelected
                 )
             }
+
+            HorizontalDivider(
+                color = NothingWhite.copy(alpha = 0.5f),
+                thickness = 2.dp
+            )
+            FollowFocusModeRow(
+                enabled = followFocusMode,
+                onToggle = onToggleFollowFocusMode
+            )
         }
     }
 }
@@ -189,6 +201,47 @@ private fun TimerCardIntervalSelector(
     }
 }
 
+@Composable
+private fun FollowFocusModeRow(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "FOLLOW FOCUS MODE",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+            Text(
+                text = if (enabled) "DAILY ROTATION WHILE IN DND / FOCUS" else "CHANGES NORMALLY IN DND / FOCUS",
+                style = MaterialTheme.typography.labelSmall,
+                color = NothingWhite.copy(alpha = 0.4f),
+                letterSpacing = 0.5.sp
+            )
+        }
+
+        Switch(
+            checked = enabled,
+            onCheckedChange = onToggle,
+            modifier = Modifier.scale(0.8f),
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = NothingBlack,
+                checkedTrackColor = NothingWhite,
+                uncheckedThumbColor = NothingWhite,
+                uncheckedTrackColor = NothingBlack,
+                uncheckedBorderColor = NothingWhite.copy(alpha = 0.5f)
+            )
+        )
+    }
+}
+
 @Preview(name = "Per Lock (default)", showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 fun PreviewTimerCardPerLock() {
@@ -197,8 +250,10 @@ fun PreviewTimerCardPerLock() {
             TimerSettingsCard(
                 rotationTrigger = RotationTrigger.ON_LOCK,
                 timerInterval = TimerInterval.DAILY,
+                followFocusMode = false,
                 onToggleTimedMode = {},
-                onIntervalSelected = {}
+                onIntervalSelected = {},
+                onToggleFollowFocusMode = {}
             )
         }
     }
@@ -212,8 +267,27 @@ fun PreviewTimerCardTimed() {
             TimerSettingsCard(
                 rotationTrigger = RotationTrigger.TIMED,
                 timerInterval = TimerInterval.SIX_HOURS,
+                followFocusMode = false,
                 onToggleTimedMode = {},
-                onIntervalSelected = {}
+                onIntervalSelected = {},
+                onToggleFollowFocusMode = {}
+            )
+        }
+    }
+}
+
+@Preview(name = "Follow Focus Mode on", showBackground = true, backgroundColor = 0xFF000000)
+@Composable
+fun PreviewTimerCardFollowFocus() {
+    MaterialTheme {
+        Box(Modifier.padding(16.dp)) {
+            TimerSettingsCard(
+                rotationTrigger = RotationTrigger.ON_LOCK,
+                timerInterval = TimerInterval.DAILY,
+                followFocusMode = true,
+                onToggleTimedMode = {},
+                onIntervalSelected = {},
+                onToggleFollowFocusMode = {}
             )
         }
     }

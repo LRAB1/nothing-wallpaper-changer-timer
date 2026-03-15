@@ -116,7 +116,7 @@ class WallpaperService : Service() {
                     NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED -> {
                         // When paused (power save), skip live adjustments; resumeEngine() will
                         // re-evaluate DND/Focus state when the engine is restored.
-                        if (!isPaused && isAlive) {
+                        if (!isPaused && isAlive && WallpaperRepository.getWallpaperConfig().followFocusMode) {
                             if (isInFocusOrDndMode()) {
                                 applyFocusDndOverride()
                             } else {
@@ -179,7 +179,7 @@ class WallpaperService : Service() {
                 }
 
                 // Override to daily rotation when DND or Nothing OS Focus mode is active
-                if (isInFocusOrDndMode()) {
+                if (config.followFocusMode && isInFocusOrDndMode()) {
                     applyFocusDndOverride()
                 }
             }else{
@@ -259,7 +259,7 @@ class WallpaperService : Service() {
         isPaused = false
         WallpaperRepository.setServicePaused(false)
 
-        if (isInFocusOrDndMode()) {
+        if (isInFocusOrDndMode() && WallpaperRepository.getWallpaperConfig().followFocusMode) {
             applyFocusDndOverride()
         } else {
             // Clear any stale override flag that may have been set before the pause
