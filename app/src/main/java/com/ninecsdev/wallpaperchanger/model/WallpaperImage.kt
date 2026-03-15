@@ -33,13 +33,3 @@ data class WallpaperImage(
     val isManuallyAdded: Boolean = false,
     val addedAt: Long = System.currentTimeMillis()
 )
-
-/**
- * Rules for cropping the wallpaper.
- */
-enum class CropRule {
-    CENTER,
-    LEFT,
-    RIGHT,
-    FIT
-}

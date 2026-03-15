@@ -18,8 +18,6 @@ import com.ninecsdev.wallpaperchanger.model.WallpaperImage
     WallpaperCollection::class,
     WallpaperImage::class],
     version = 2,
-    // When changing the schema, increment the version number
-    // and add: autoMigrations = [AutoMigration(from = 1, to = 2)]
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -47,11 +45,11 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
                     "ALTER TABLE collections ADD COLUMN rotationFrequency TEXT NOT NULL DEFAULT 'PER_LOCK'"
                 )
-                database.execSQL(
+                db.execSQL(
                     "ALTER TABLE collections ADD COLUMN lastWallpaperChangeAt INTEGER NOT NULL DEFAULT 0"
                 )
             }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -159,7 +161,7 @@ private fun RotationFrequencySelector(
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         TimerOptionButton(
             label = "PER LOCK",
@@ -194,13 +196,16 @@ private fun TimerOptionButton(
         modifier = modifier,
         shape = RoundedCornerShape(8.dp),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = NothingWhite),
-        border = BorderStroke(1.dp, NothingWhite.copy(alpha = if (selected) 0.8f else 0.3f))
+        border = BorderStroke(1.dp, NothingWhite.copy(alpha = if (selected) 0.8f else 0.3f)),
+        contentPadding = PaddingValues(horizontal = 4.dp)
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            color = NothingWhite.copy(alpha = if (selected) 1f else 0.7f)
+            color = NothingWhite.copy(alpha = if (selected) 1f else 0.7f),
+            maxLines = 1,
+            textAlign = TextAlign.Center
         )
     }
 }

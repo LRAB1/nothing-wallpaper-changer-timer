@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 
 /**
@@ -27,22 +26,6 @@ data class WallpaperCollection(
     val createdAt: Long = System.currentTimeMillis(),
     val lastUsedAt: Long = System.currentTimeMillis()
 )
-
-/**
- * Defines how images are added to a collection.
- */
-enum class CollectionType {
-    /** Images are automatically retrieved from an external folder. */
-    FOLDER,
-    /** Images are individually selected by the user. */
-    MANUAL
-}
-
-enum class RotationFrequency {
-    PER_LOCK,
-    HOURLY,
-    PER_DAY
-}
 
 fun WallpaperCollection.shouldRotateAt(
     nowMillis: Long = System.currentTimeMillis(),
