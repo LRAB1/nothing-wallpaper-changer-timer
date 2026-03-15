@@ -13,6 +13,7 @@ import com.ninecsdev.wallpaperchanger.logic.BufferManager
 import com.ninecsdev.wallpaperchanger.logic.ImageInternalizer
 import com.ninecsdev.wallpaperchanger.model.CollectionType
 import com.ninecsdev.wallpaperchanger.model.CropRule
+import com.ninecsdev.wallpaperchanger.model.RotationFrequency
 import com.ninecsdev.wallpaperchanger.model.ServiceState
 import com.ninecsdev.wallpaperchanger.model.WallpaperCollection
 import com.ninecsdev.wallpaperchanger.model.WallpaperImage
@@ -162,8 +163,24 @@ object WallpaperRepository {
         return dao.getImageCountOfCollection(collectionId)
     }
 
-    suspend fun updateCollection(id: Long, newName: String, newRule: CropRule) {
-        dao.updateCollection(id, newName, newRule)
+    suspend fun updateCollection(
+        id: Long,
+        newName: String,
+        newRule: CropRule,
+        newFrequency: RotationFrequency
+    ) {
+        withContext(Dispatchers.IO) {
+            dao.updateCollection(id, newName, newRule, newFrequency)
+            if (dao.getActiveCollection()?.id == id) {
+                refillDiskBuffer()
+            }
+        }
+    }
+
+    suspend fun markWallpaperChanged(collectionId: Long) {
+        withContext(Dispatchers.IO) {
+            dao.updateLastWallpaperChangeAt(collectionId)
+        }
     }
 
     suspend fun deleteCollection(collection: WallpaperCollection) {

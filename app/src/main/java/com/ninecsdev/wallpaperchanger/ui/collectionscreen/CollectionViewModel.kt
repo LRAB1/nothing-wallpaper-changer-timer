@@ -8,6 +8,7 @@ import com.ninecsdev.wallpaperchanger.data.WallpaperRepository
 import com.ninecsdev.wallpaperchanger.logic.ImageInternalizer
 import com.ninecsdev.wallpaperchanger.model.CollectionSortOrder
 import com.ninecsdev.wallpaperchanger.model.CropRule
+import com.ninecsdev.wallpaperchanger.model.RotationFrequency
 import com.ninecsdev.wallpaperchanger.model.WallpaperCollection
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -117,9 +118,14 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun updateCollection(collectionId: Long, newName: String, cropRule: CropRule) {
+    fun updateCollection(
+        collectionId: Long,
+        newName: String,
+        cropRule: CropRule,
+        rotationFrequency: RotationFrequency
+    ) {
         viewModelScope.launch {
-            repository.updateCollection(collectionId, newName, cropRule)
+            repository.updateCollection(collectionId, newName, cropRule, rotationFrequency)
         }
     }
 

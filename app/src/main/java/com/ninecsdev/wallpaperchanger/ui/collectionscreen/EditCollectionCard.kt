@@ -42,6 +42,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.ninecsdev.wallpaperchanger.R
 import com.ninecsdev.wallpaperchanger.model.CollectionType
 import com.ninecsdev.wallpaperchanger.model.CropRule
+import com.ninecsdev.wallpaperchanger.model.RotationFrequency
 import com.ninecsdev.wallpaperchanger.model.WallpaperCollection
 import com.ninecsdev.wallpaperchanger.ui.components.CropRuleSelector
 import com.ninecsdev.wallpaperchanger.ui.components.NothingTextField
@@ -58,13 +59,14 @@ fun EditCollectionCard(
     collection: WallpaperCollection,
     isProcessing: Boolean = false,
     onDismiss: () -> Unit,
-    onEdit: (String, CropRule) -> Unit,
+    onEdit: (String, CropRule, RotationFrequency) -> Unit,
     onDelete: () -> Unit,
     onSetActive: () -> Unit,
     onSyncClick: () -> Unit
 ) {
     var nameText by remember { mutableStateOf(collection.name) }
     var selectedRule by remember { mutableStateOf(collection.defaultCropRule) }
+    var selectedRotationFrequency by remember { mutableStateOf(collection.rotationFrequency) }
 
     Dialog(
         onDismissRequest = if (isProcessing) ({}) else onDismiss,
@@ -102,6 +104,13 @@ fun EditCollectionCard(
                         onRuleSelected = { selectedRule = it }
                     )
 
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    RotationFrequencySelector(
+                        selectedFrequency = selectedRotationFrequency,
+                        onFrequencySelected = { selectedRotationFrequency = it }
+                    )
+
                     Spacer(modifier = Modifier.height(24.dp))
 
                     ManagementButtons(onDelete = onDelete)
@@ -110,9 +119,14 @@ fun EditCollectionCard(
 
                     EditCardActions(
                         isActive = collection.isActive,
-                        isChanged = nameText != collection.name || selectedRule != collection.defaultCropRule,
+                        isChanged = nameText != collection.name ||
+                            selectedRule != collection.defaultCropRule ||
+                            selectedRotationFrequency != collection.rotationFrequency,
                         onSetActive = onSetActive,
-                        onSave = { onEdit(nameText, selectedRule); onDismiss() },
+                        onSave = {
+                            onEdit(nameText, selectedRule, selectedRotationFrequency)
+                            onDismiss()
+                        },
                         onDismiss = onDismiss
                     )
                 }
@@ -125,6 +139,69 @@ fun EditCollectionCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun RotationFrequencySelector(
+    selectedFrequency: RotationFrequency,
+    onFrequencySelected: (RotationFrequency) -> Unit
+) {
+    Text(
+        text = "ROTATION FREQUENCY",
+        style = MaterialTheme.typography.labelSmall,
+        color = NothingWhite.copy(alpha = 0.7f),
+        letterSpacing = 1.sp,
+        fontWeight = FontWeight.Bold
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        TimerOptionButton(
+            label = "PER LOCK",
+            selected = selectedFrequency == RotationFrequency.PER_LOCK,
+            onClick = { onFrequencySelected(RotationFrequency.PER_LOCK) },
+            modifier = Modifier.weight(1f)
+        )
+        TimerOptionButton(
+            label = "EVERY 1H",
+            selected = selectedFrequency == RotationFrequency.HOURLY,
+            onClick = { onFrequencySelected(RotationFrequency.HOURLY) },
+            modifier = Modifier.weight(1f)
+        )
+        TimerOptionButton(
+            label = "DAILY",
+            selected = selectedFrequency == RotationFrequency.PER_DAY,
+            onClick = { onFrequencySelected(RotationFrequency.PER_DAY) },
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun TimerOptionButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = NothingWhite),
+        border = BorderStroke(1.dp, NothingWhite.copy(alpha = if (selected) 0.8f else 0.3f))
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = NothingWhite.copy(alpha = if (selected) 1f else 0.7f)
+        )
     }
 }
 
@@ -249,7 +326,7 @@ fun EditCollectionCardPreview() {
                 type = CollectionType.FOLDER
             ),
             onDismiss = {},
-            onEdit = { _, _ -> },
+            onEdit = { _, _, _ -> },
             onDelete = {},
             onSetActive = {},
             onSyncClick = {}
@@ -269,7 +346,7 @@ fun EditCollectionCardManualPreview() {
                     type = CollectionType.MANUAL
                 ),
                 onDismiss = {},
-                onEdit = { _, _ -> },
+                onEdit = { _, _, _ -> },
                 onDelete = {},
                 onSetActive = {},
                 onSyncClick = {}
@@ -290,7 +367,7 @@ fun EditCollectionCardActivePreview() {
                 isActive = true
             ),
             onDismiss = {},
-            onEdit = { _, _ -> },
+            onEdit = { _, _, _ -> },
             onDelete = {},
             onSetActive = {},
             onSyncClick = {}
@@ -311,7 +388,7 @@ fun EditCollectionCardSyncingPreview() {
                 ),
                 isProcessing = true,
                 onDismiss = {},
-                onEdit = { _, _ -> },
+                onEdit = { _, _, _ -> },
                 onDelete = {},
                 onSetActive = {},
                 onSyncClick = {}
