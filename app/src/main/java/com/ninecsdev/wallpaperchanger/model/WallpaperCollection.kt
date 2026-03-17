@@ -29,14 +29,24 @@ data class WallpaperCollection(
     val lastUsedAt: Long = System.currentTimeMillis()
 )
 
-/**
- * Defines how images are added to a collection.
- */
-enum class CollectionType {
-    /** Images are automatically retrieved from an external folder. */
-    FOLDER,
-    /** Images are individually selected by the user. */
-    MANUAL
+fun WallpaperCollection.shouldRotateAt(
+    nowMillis: Long = System.currentTimeMillis(),
+    zoneId: ZoneId = ZoneId.systemDefault()
+): Boolean {
+    return when (rotationFrequency) {
+        RotationFrequency.PER_LOCK -> true
+        RotationFrequency.HOURLY -> {
+            if (lastWallpaperChangeAt <= 0L) return true
+            nowMillis - lastWallpaperChangeAt >= 60L * 60L * 1000L
+        }
+        RotationFrequency.PER_DAY -> {
+            if (lastWallpaperChangeAt <= 0L) return true
+
+            val lastChangeDate = Instant.ofEpochMilli(lastWallpaperChangeAt).atZone(zoneId).toLocalDate()
+            val nowDate = Instant.ofEpochMilli(nowMillis).atZone(zoneId).toLocalDate()
+            nowDate.isAfter(lastChangeDate)
+        }
+    }
 }
 
 enum class RotationFrequency {
