@@ -54,22 +54,24 @@ class ScreenOffReceiver : BroadcastReceiver() {
                     return@launch
                 }
 
-                // Evaluate focus/DND state after delay and against the active collection setting.
-                // Some OEMs toggle focus state slightly after screen-off, so checking here is safer.
-                if (activeCollection.skipOnDnd && WallpaperRepository.isDndActive(failSafeWhenUnknown = true)) {
-                    Log.d(tag, "DND/Focus mode active. Skipping wallpaper change for collection '${activeCollection.name}'.")
-                    return@launch
-                }
-
-                // Some Nothing/Wellbeing builds publish focus state a bit later than screen-off.
-                // Perform one short retry before applying wallpaper.
+                // Strict mode: gate rotation on actual DND interruption filter only.
                 if (activeCollection.skipOnDnd) {
-                    delay(350)
-                    if (WallpaperRepository.isDndActive(failSafeWhenUnknown = true)) {
-                        Log.d(tag, "DND/Focus mode became active shortly after lock. Skipping wallpaper change.")
+                    val dndCheck = WallpaperRepository.getStrictDndDiagnosticSnapshot()
+                    if (dndCheck.active) {
+                        Log.d(
+                            tag,
+                            "DND mode active. Skipping wallpaper change for collection '${activeCollection.name}' " +
+                                "(branch=${dndCheck.branch}, details=${dndCheck.details})."
+                        )
                         return@launch
                     }
+                    Log.d(
+                        tag,
+                        "DND not active before rotate check " +
+                            "(branch=${dndCheck.branch}, details=${dndCheck.details})."
+                    )
                 }
+
 
                 if (!activeCollection.shouldRotateAt()) {
                     val frequencyLabel = when (activeCollection.rotationFrequency) {
