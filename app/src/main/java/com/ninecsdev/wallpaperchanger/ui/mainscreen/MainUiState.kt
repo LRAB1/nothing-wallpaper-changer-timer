@@ -24,7 +24,7 @@ data class MainUiState(
     val revertToDefaultOnStop: Boolean = true,
 
     // Service Settings
-    val delayLabel: DelayLabel = DelayLabel.MEDIUM,
+    val delayLabel: DelayLabel = DelayLabel.SHORT,
 
     // Top-level navigation (will be overhauled with Jetpack Navigation)
     val isShowingLists: Boolean = false

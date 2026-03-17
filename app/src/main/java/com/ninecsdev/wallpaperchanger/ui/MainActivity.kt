@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.app.NotificationManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
@@ -74,6 +75,13 @@ class MainActivity : ComponentActivity() {
 
     // Battery optimization exemption (Required for boot-start)
     private val batteryExemptionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        startWallpaperService()
+    }
+
+    // Notification policy access (improves DND/Focus detection reliability)
+    private val notificationPolicyLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
         startWallpaperService()
@@ -159,14 +167,14 @@ class MainActivity : ComponentActivity() {
                                         )
                                     )
                                 },
-                                onCreateClick = { name, rule, frequency ->
+                                onCreateClick = { name, rule, frequency, skipOnDnd ->
                                     if (collectionViewModel.hasPendingFolder()) {
-                                        collectionViewModel.finalizeFolderCollection(name, rule, frequency) {
+                                        collectionViewModel.finalizeFolderCollection(name, rule, frequency, skipOnDnd) {
                                             collectionViewModel.toggleCreateModal(false)
                                             if (collectionState.allCollections.isEmpty()) checkPermissionsAndStart()
                                         }
                                     } else {
-                                        collectionViewModel.finalizeManualCollection(name, rule, frequency) {
+                                        collectionViewModel.finalizeManualCollection(name, rule, frequency, skipOnDnd) {
                                             collectionViewModel.toggleCreateModal(false)
                                             if (collectionState.allCollections.isEmpty()) checkPermissionsAndStart()
                                         }
@@ -180,12 +188,13 @@ class MainActivity : ComponentActivity() {
                                 collection = collection,
                                 isProcessing = collectionState.isProcessing,
                                 onDismiss = { collectionViewModel.closeEditModal() },
-                                onEdit = { newName, newRule, newFrequency ->
+                                onEdit = { newName, newRule, newFrequency, newSkipOnDnd ->
                                     collectionViewModel.updateCollection(
                                         collection.id,
                                         newName,
                                         newRule,
-                                        newFrequency
+                                        newFrequency,
+                                        newSkipOnDnd
                                     )
                                 },
                                 onSetActive = { mainViewModel.setActiveCollection(collection.id) },
@@ -227,6 +236,14 @@ class MainActivity : ComponentActivity() {
      * regardless of the user's choice (it only affects boot-start behavior).
      */
     private fun startWallpaperService() {
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        val activeCollectionNeedsDndProtection = mainViewModel.uiState.value.activeCollection?.skipOnDnd == true
+        if (activeCollectionNeedsDndProtection && notificationManager?.isNotificationPolicyAccessGranted == false) {
+            val policyIntent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+            notificationPolicyLauncher.launch(policyIntent)
+            return
+        }
+
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         if (!pm.isIgnoringBatteryOptimizations(packageName)) {
             val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {

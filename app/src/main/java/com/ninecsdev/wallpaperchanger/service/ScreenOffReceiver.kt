@@ -38,12 +38,6 @@ class ScreenOffReceiver : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Skip if Do Not Disturb is active and user enabled the setting
-                if (WallpaperRepository.shouldSkipOnDnd() && WallpaperRepository.isDndActive()) {
-                    Log.d(tag, "DND/Focus mode active. Skipping wallpaper change as per user setting.")
-                    return@launch
-                }
-
                 // Apply user-selected animation delay
                 val selectedDelay = WallpaperRepository.getDelayLabel().milliseconds
                 delay(selectedDelay)
@@ -58,6 +52,23 @@ class ScreenOffReceiver : BroadcastReceiver() {
                 if (activeCollection == null) {
                     Log.w(tag, "No active collection found. Skipping wallpaper change.")
                     return@launch
+                }
+
+                // Evaluate focus/DND state after delay and against the active collection setting.
+                // Some OEMs toggle focus state slightly after screen-off, so checking here is safer.
+                if (activeCollection.skipOnDnd && WallpaperRepository.isDndActive(failSafeWhenUnknown = true)) {
+                    Log.d(tag, "DND/Focus mode active. Skipping wallpaper change for collection '${activeCollection.name}'.")
+                    return@launch
+                }
+
+                // Some Nothing/Wellbeing builds publish focus state a bit later than screen-off.
+                // Perform one short retry before applying wallpaper.
+                if (activeCollection.skipOnDnd) {
+                    delay(350)
+                    if (WallpaperRepository.isDndActive(failSafeWhenUnknown = true)) {
+                        Log.d(tag, "DND/Focus mode became active shortly after lock. Skipping wallpaper change.")
+                        return@launch
+                    }
                 }
 
                 if (!activeCollection.shouldRotateAt()) {

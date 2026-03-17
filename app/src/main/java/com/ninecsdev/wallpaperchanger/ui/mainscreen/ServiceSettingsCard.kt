@@ -94,6 +94,7 @@ fun ServiceSettingsCard(
                         modifier = Modifier.weight(1f)
                     )
                 }
+
             }
         }
     }

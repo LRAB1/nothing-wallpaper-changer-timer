@@ -4,9 +4,11 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.PowerManager
 import android.provider.DocumentsContract
 import android.provider.Settings
+import android.service.notification.Condition
 import android.util.Log
 import com.ninecsdev.wallpaperchanger.data.local.AppDatabase
 import com.ninecsdev.wallpaperchanger.data.local.AppPreferences
@@ -53,7 +55,7 @@ object WallpaperRepository {
     private val _revertToDefaultFlow = MutableStateFlow(true)
     val revertToDefaultFlow: StateFlow<Boolean> = _revertToDefaultFlow.asStateFlow()
 
-    private val _delayLabelFlow = MutableStateFlow(DelayLabel.MEDIUM)
+    private val _delayLabelFlow = MutableStateFlow(DelayLabel.SHORT)
     val delayLabelFlow: StateFlow<DelayLabel> = _delayLabelFlow.asStateFlow()
 
     fun initialize(context: Context) {
@@ -443,8 +445,9 @@ object WallpaperRepository {
     /**
      * Checks if Do Not Disturb, Focus Mode, or Bedtime Mode is currently active.
      */
-    fun isDndActive(): Boolean {
+    fun isDndActive(failSafeWhenUnknown: Boolean = false): Boolean {
         val nm = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        val hasPolicyAccess = nm?.isNotificationPolicyAccessGranted == true
         
         // 1. Check system interruption filter (DND)
         val filter = nm?.currentInterruptionFilter ?: NotificationManager.INTERRUPTION_FILTER_ALL
@@ -452,31 +455,160 @@ object WallpaperRepository {
             return true
         }
 
-        // 2. Fallback: Check Zen Mode and Focus Mode settings directly.
-        // Some OEMs and Digital Wellbeing versions don't update the global filter for all focus states.
+        // 1.5 Focus-specific check: some OEMs keep interruption filter as ALL while
+        // a Focus/Wellbeing automatic Zen rule is active.
+        if (hasPolicyAccess) {
+            nm?.let {
+                if (isFocusZenRuleActive(it)) return true
+            }
+        }
+
+        // 2. Fallback: Check Zen/Focus/Bedtime keys directly.
+        // Read each key independently because some secure settings can throw on certain OEM builds.
         val resolver = appContext.contentResolver
-        try {
-            // Global Zen Mode (0=Off, 1=Priority, 2=Total Silence, 3=Alarms)
-            if (Settings.Global.getInt(resolver, "zen_mode", 0) != 0) return true
 
-            // Digital Wellbeing Focus Mode keys
-            if (Settings.Secure.getInt(resolver, "focus_mode_enabled", 0) != 0) return true
-            if (Settings.Secure.getInt(resolver, "focus_mode_session_id", -1) != -1) return true
-            if (Settings.Secure.getInt(resolver, "focus_mode_session_status", 0) != 0) return true
+        fun readGlobal(name: String, default: Int = 0): Int? {
+            return try {
+                Settings.Global.getInt(resolver, name, default)
+            } catch (_: Exception) {
+                null
+            }
+        }
 
-            // Bedtime Mode keys
-            if (Settings.Global.getInt(resolver, "bedtime_mode_enabled", 0) != 0) return true
-            if (Settings.Secure.getInt(resolver, "bedtime_mode_enabled", 0) != 0) return true
+        fun readSecure(name: String, default: Int = 0): Int? {
+            return try {
+                Settings.Secure.getInt(resolver, name, default)
+            } catch (_: Exception) {
+                null
+            }
+        }
 
-            // OEM and variations
-            if (Settings.Secure.getInt(resolver, "wellbeing_focus_mode_enabled", 0) != 0) return true
-            if (Settings.System.getInt(resolver, "focus_mode_enabled", 0) != 0) return true
+        fun readSystem(name: String, default: Int = 0): Int? {
+            return try {
+                Settings.System.getInt(resolver, name, default)
+            } catch (_: Exception) {
+                null
+            }
+        }
 
-        } catch (e: Exception) {
-            // Settings might be restricted on some devices, ignore and return false
+        fun readGlobalString(name: String): String? {
+            return try {
+                Settings.Global.getString(resolver, name)
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        fun readSecureString(name: String): String? {
+            return try {
+                Settings.Secure.getString(resolver, name)
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        fun readSystemString(name: String): String? {
+            return try {
+                Settings.System.getString(resolver, name)
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        fun isTruthy(raw: String?): Boolean {
+            val value = raw?.trim()?.lowercase() ?: return false
+            if (value.isBlank()) return false
+            return value == "1" ||
+                value == "true" ||
+                value == "on" ||
+                value == "enabled" ||
+                value == "active" ||
+                value.contains("focus") && !value.contains("off") ||
+                value.contains("active") ||
+                value.contains("enabled")
+        }
+
+        // Global Zen Mode (0=Off, 1=Priority, 2=Total Silence, 3=Alarms)
+        if ((readGlobal("zen_mode", 0) ?: 0) != 0) return true
+
+        // Digital Wellbeing Focus Mode keys
+        if ((readSecure("focus_mode_enabled", 0) ?: 0) != 0) return true
+        if ((readSecure("focus_mode_session_id", -1) ?: -1) != -1) return true
+        if ((readSecure("focus_mode_session_status", 0) ?: 0) != 0) return true
+
+        // Bedtime Mode keys
+        if ((readGlobal("bedtime_mode_enabled", 0) ?: 0) != 0) return true
+        if ((readSecure("bedtime_mode_enabled", 0) ?: 0) != 0) return true
+
+        // OEM/custom ROM variants
+        if ((readSecure("wellbeing_focus_mode_enabled", 0) ?: 0) != 0) return true
+        if ((readSystem("focus_mode_enabled", 0) ?: 0) != 0) return true
+        if ((readSecure("nt_focus_mode_enabled", 0) ?: 0) != 0) return true
+        if ((readSecure("focus_mode_state", 0) ?: 0) != 0) return true
+
+        val focusKeys = listOf(
+            "focus_mode_enabled",
+            "focus_mode_state",
+            "focus_mode_on",
+            "focus_mode_active",
+            "focus_mode_activated",
+            "focus_mode_session_status",
+            "wellbeing_focus_mode_enabled",
+            "digital_wellbeing_focus_mode_enabled",
+            "nt_focus_mode_enabled",
+            "nt_focus_mode_state"
+        )
+        for (key in focusKeys) {
+            if (isTruthy(readGlobalString(key))) return true
+            if (isTruthy(readSecureString(key))) return true
+            if (isTruthy(readSystemString(key))) return true
+        }
+
+        if (failSafeWhenUnknown && !hasPolicyAccess && filter == NotificationManager.INTERRUPTION_FILTER_UNKNOWN) {
+            Log.w(TAG, "Notification policy access not granted and interruption filter unknown. Failing safe: treating DND/Focus as active.")
+            return true
         }
 
         return false
+    }
+
+    private fun isFocusZenRuleActive(notificationManager: NotificationManager): Boolean {
+        return try {
+            val rules = notificationManager.automaticZenRules
+            if (rules.isEmpty()) return false
+
+            for ((id, rule) in rules) {
+                val name = rule.name?.toString()?.lowercase().orEmpty()
+                val owner = rule.owner?.toString()?.lowercase().orEmpty()
+                val looksLikeFocusRule =
+                    name.contains("focus") ||
+                        name.contains("wellbeing") ||
+                        owner.contains("wellbeing") ||
+                        owner.contains("digitalwellbeing") ||
+                        owner.contains("focus")
+
+                if (!looksLikeFocusRule) continue
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                    val state = notificationManager.getAutomaticZenRuleState(id)
+                    if (state == Condition.STATE_TRUE) return true
+
+                    // Be conservative for OEM rules that expose focus rule but don't report true.
+                    if (state == Condition.STATE_UNKNOWN && rule.isEnabled) return true
+                } else {
+                    // Older Android: fallback to enabled rule metadata.
+                    if (rule.isEnabled &&
+                        rule.interruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL) {
+                        return true
+                    }
+                }
+            }
+            false
+        } catch (_: SecurityException) {
+            false
+        } catch (_: Exception) {
+            false
+        }
     }
 
     // File System Utilities

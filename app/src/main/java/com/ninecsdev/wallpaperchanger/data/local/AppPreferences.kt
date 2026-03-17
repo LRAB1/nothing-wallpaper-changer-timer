@@ -77,11 +77,11 @@ object AppPreferences {
     }
 
     fun getDelayLabel(context: Context): DelayLabel {
-        val name = getPrefs(context).getString(KEY_DELAY_LABEL, DelayLabel.MEDIUM.name)
+        val name = getPrefs(context).getString(KEY_DELAY_LABEL, DelayLabel.SHORT.name)
         return try {
-            DelayLabel.valueOf(name ?: DelayLabel.MEDIUM.name)
+            DelayLabel.valueOf(name ?: DelayLabel.SHORT.name)
         } catch (e: Exception) {
-            DelayLabel.MEDIUM
+            DelayLabel.SHORT
         }
     }
 

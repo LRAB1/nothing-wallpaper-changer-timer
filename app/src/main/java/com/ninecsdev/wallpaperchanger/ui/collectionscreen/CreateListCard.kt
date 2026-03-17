@@ -210,6 +210,13 @@ private fun FollowFocusSelector(
             )
         )
     }
+
+    Text(
+        text = "TIP: Focus Mode detection varies by OEM. Grant DND access for best accuracy.",
+        color = NothingWhite.copy(alpha = 0.55f),
+        style = MaterialTheme.typography.labelSmall,
+        modifier = Modifier.padding(top = 4.dp)
+    )
 }
 
 @Composable
