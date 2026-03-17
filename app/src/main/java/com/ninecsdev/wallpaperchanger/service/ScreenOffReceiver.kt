@@ -38,12 +38,19 @@ class ScreenOffReceiver : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 250ms delay for Nothing Phone (1) animation
-                delay(250) //TODO: let the user choose the delay
+                // Skip if Do Not Disturb is active and user enabled the setting
+                if (WallpaperRepository.shouldSkipOnDnd() && WallpaperRepository.isDndActive()) {
+                    Log.d(tag, "DND/Focus mode active. Skipping wallpaper change as per user setting.")
+                    return@launch
+                }
+
+                // Apply user-selected animation delay
+                val selectedDelay = WallpaperRepository.getDelayLabel().milliseconds
+                delay(selectedDelay)
 
                 // Safety check: if the user woke the screen during the delay abort
                 if (powerManager.isInteractive) {
-                    Log.w(tag, "Screen woke up. Aborting.")
+                    Log.w(tag, "Screen woke up during ${selectedDelay}ms delay. Aborting.")
                     return@launch
                 }
 

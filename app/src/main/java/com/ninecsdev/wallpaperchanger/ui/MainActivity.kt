@@ -135,7 +135,8 @@ class MainActivity : ComponentActivity() {
 
                                     startService(intent)
                                     mainViewModel.refreshServiceState()
-                                }
+                                },
+                                onDelaySelected = { mainViewModel.setDelayLabel(it) }
                             )
                         }
 
@@ -158,14 +159,14 @@ class MainActivity : ComponentActivity() {
                                         )
                                     )
                                 },
-                                onCreateClick = { name, rule ->
+                                onCreateClick = { name, rule, frequency ->
                                     if (collectionViewModel.hasPendingFolder()) {
-                                        collectionViewModel.finalizeFolderCollection(name, rule) {
+                                        collectionViewModel.finalizeFolderCollection(name, rule, frequency) {
                                             collectionViewModel.toggleCreateModal(false)
                                             if (collectionState.allCollections.isEmpty()) checkPermissionsAndStart()
                                         }
                                     } else {
-                                        collectionViewModel.finalizeManualCollection(name, rule) {
+                                        collectionViewModel.finalizeManualCollection(name, rule, frequency) {
                                             collectionViewModel.toggleCreateModal(false)
                                             if (collectionState.allCollections.isEmpty()) checkPermissionsAndStart()
                                         }

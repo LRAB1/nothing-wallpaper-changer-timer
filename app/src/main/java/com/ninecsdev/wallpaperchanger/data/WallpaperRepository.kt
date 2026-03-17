@@ -1,10 +1,12 @@
 package com.ninecsdev.wallpaperchanger.data
 
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.DocumentsContract
+import android.provider.Settings
 import android.util.Log
 import com.ninecsdev.wallpaperchanger.data.local.AppDatabase
 import com.ninecsdev.wallpaperchanger.data.local.AppPreferences
@@ -13,6 +15,7 @@ import com.ninecsdev.wallpaperchanger.logic.BufferManager
 import com.ninecsdev.wallpaperchanger.logic.ImageInternalizer
 import com.ninecsdev.wallpaperchanger.model.CollectionType
 import com.ninecsdev.wallpaperchanger.model.CropRule
+import com.ninecsdev.wallpaperchanger.model.DelayLabel
 import com.ninecsdev.wallpaperchanger.model.RotationFrequency
 import com.ninecsdev.wallpaperchanger.model.ServiceState
 import com.ninecsdev.wallpaperchanger.model.WallpaperCollection
@@ -50,6 +53,9 @@ object WallpaperRepository {
     private val _revertToDefaultFlow = MutableStateFlow(true)
     val revertToDefaultFlow: StateFlow<Boolean> = _revertToDefaultFlow.asStateFlow()
 
+    private val _delayLabelFlow = MutableStateFlow(DelayLabel.MEDIUM)
+    val delayLabelFlow: StateFlow<DelayLabel> = _delayLabelFlow.asStateFlow()
+
     fun initialize(context: Context) {
         if (!::appContext.isInitialized) {
             appContext = context.applicationContext
@@ -57,6 +63,7 @@ object WallpaperRepository {
 
             _defaultWallpaperUriFlow.value = AppPreferences.getDefaultWallpaperUri(appContext)
             _revertToDefaultFlow.value = AppPreferences.shouldRevertToDefault(appContext)
+            _delayLabelFlow.value = AppPreferences.getDelayLabel(appContext)
             _serviceStateFlow.value = ServiceState.Stopped
         }
     }
@@ -80,7 +87,13 @@ object WallpaperRepository {
 
     // Collection Management
 
-    suspend fun importFolderAsCollection(name: String, treeUri: Uri, rule: CropRule) {
+    suspend fun importFolderAsCollection(
+        name: String, 
+        treeUri: Uri, 
+        rule: CropRule, 
+        frequency: RotationFrequency,
+        skipOnDnd: Boolean
+    ) {
         withContext(Dispatchers.IO) {
             val isFirst = dao.getActiveCollection() == null
 
@@ -90,7 +103,9 @@ object WallpaperRepository {
                     type = CollectionType.FOLDER,
                     rootUri = treeUri,
                     isActive = isFirst,
-                    defaultCropRule = rule
+                    defaultCropRule = rule,
+                    rotationFrequency = frequency,
+                    skipOnDnd = skipOnDnd
                 )
             )
 
@@ -102,7 +117,13 @@ object WallpaperRepository {
         }
     }
 
-    suspend fun createManualCollection(name: String, uris: List<Uri>, rule: CropRule) {
+    suspend fun createManualCollection(
+        name: String, 
+        uris: List<Uri>, 
+        rule: CropRule, 
+        frequency: RotationFrequency,
+        skipOnDnd: Boolean
+    ) {
         withContext(Dispatchers.IO) {
             val isFirst = dao.getActiveCollection() == null
 
@@ -112,7 +133,9 @@ object WallpaperRepository {
                     type = CollectionType.MANUAL,
                     rootUri = null,
                     isActive = isFirst,
-                    defaultCropRule = rule
+                    defaultCropRule = rule,
+                    rotationFrequency = frequency,
+                    skipOnDnd = skipOnDnd
                 )
             )
 
@@ -167,10 +190,11 @@ object WallpaperRepository {
         id: Long,
         newName: String,
         newRule: CropRule,
-        newFrequency: RotationFrequency
+        newFrequency: RotationFrequency,
+        newSkipOnDnd: Boolean
     ) {
         withContext(Dispatchers.IO) {
-            dao.updateCollection(id, newName, newRule, newFrequency)
+            dao.updateCollection(id, newName, newRule, newFrequency, newSkipOnDnd)
             if (dao.getActiveCollection()?.id == id) {
                 refillDiskBuffer()
             }
@@ -405,6 +429,55 @@ object WallpaperRepository {
     fun isServiceRunning(): Boolean { return AppPreferences.isServiceRunning(appContext) }
     fun shouldStartOnBoot(): Boolean = AppPreferences.shouldStartOnBoot(appContext)
     fun setStartOnBoot(enabled: Boolean) = AppPreferences.setStartOnBoot(appContext, enabled)
+
+    fun getDelayLabel(): DelayLabel = AppPreferences.getDelayLabel(appContext)
+    fun setDelayLabel(label: DelayLabel) {
+        AppPreferences.setDelayLabel(appContext, label)
+        _delayLabelFlow.value = label
+        notifyServiceStateChanged()
+    }
+
+    fun shouldSkipOnDnd(): Boolean = AppPreferences.shouldSkipOnDnd(appContext)
+    fun setSkipOnDnd(skip: Boolean) = AppPreferences.setSkipOnDnd(appContext, skip)
+
+    /**
+     * Checks if Do Not Disturb, Focus Mode, or Bedtime Mode is currently active.
+     */
+    fun isDndActive(): Boolean {
+        val nm = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        
+        // 1. Check system interruption filter (DND)
+        val filter = nm?.currentInterruptionFilter ?: NotificationManager.INTERRUPTION_FILTER_ALL
+        if (filter != NotificationManager.INTERRUPTION_FILTER_ALL && filter != NotificationManager.INTERRUPTION_FILTER_UNKNOWN) {
+            return true
+        }
+
+        // 2. Fallback: Check Zen Mode and Focus Mode settings directly.
+        // Some OEMs and Digital Wellbeing versions don't update the global filter for all focus states.
+        val resolver = appContext.contentResolver
+        try {
+            // Global Zen Mode (0=Off, 1=Priority, 2=Total Silence, 3=Alarms)
+            if (Settings.Global.getInt(resolver, "zen_mode", 0) != 0) return true
+
+            // Digital Wellbeing Focus Mode keys
+            if (Settings.Secure.getInt(resolver, "focus_mode_enabled", 0) != 0) return true
+            if (Settings.Secure.getInt(resolver, "focus_mode_session_id", -1) != -1) return true
+            if (Settings.Secure.getInt(resolver, "focus_mode_session_status", 0) != 0) return true
+
+            // Bedtime Mode keys
+            if (Settings.Global.getInt(resolver, "bedtime_mode_enabled", 0) != 0) return true
+            if (Settings.Secure.getInt(resolver, "bedtime_mode_enabled", 0) != 0) return true
+
+            // OEM and variations
+            if (Settings.Secure.getInt(resolver, "wellbeing_focus_mode_enabled", 0) != 0) return true
+            if (Settings.System.getInt(resolver, "focus_mode_enabled", 0) != 0) return true
+
+        } catch (e: Exception) {
+            // Settings might be restricted on some devices, ignore and return false
+        }
+
+        return false
+    }
 
     // File System Utilities
     // TODO: Move the file system utility to a separate class in the future.

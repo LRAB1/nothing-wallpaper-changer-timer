@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -22,6 +23,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,9 +34,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -42,11 +47,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.ninecsdev.wallpaperchanger.R
 import com.ninecsdev.wallpaperchanger.model.CropRule
+import com.ninecsdev.wallpaperchanger.model.RotationFrequency
 import com.ninecsdev.wallpaperchanger.ui.components.CropRuleSelector
 import com.ninecsdev.wallpaperchanger.ui.components.NothingButton
 import com.ninecsdev.wallpaperchanger.ui.components.NothingButtonVariant
 import com.ninecsdev.wallpaperchanger.ui.components.NothingTextField
 import com.ninecsdev.wallpaperchanger.ui.components.ProcessingOverlay
+import com.ninecsdev.wallpaperchanger.ui.components.RotationFrequencySelector
 import com.ninecsdev.wallpaperchanger.ui.theme.NothingBlack
 import com.ninecsdev.wallpaperchanger.ui.theme.NothingWhite
 
@@ -61,10 +68,12 @@ fun CreateListCard(
     onDismiss: () -> Unit,
     onFolderSelect: () -> Unit,
     onPhotosSelect: () -> Unit,
-    onCreateClick: (String, CropRule) -> Unit
+    onCreateClick: (String, CropRule, RotationFrequency, Boolean) -> Unit
 ) {
     var listName by remember { mutableStateOf("") }
     var selectedRule by remember { mutableStateOf(CropRule.CENTER) }
+    var selectedRotationFrequency by remember { mutableStateOf(RotationFrequency.PER_LOCK) }
+    var followFocus by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = if (isProcessing) ({}) else onDismiss,
@@ -124,11 +133,23 @@ fun CreateListCard(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    RotationFrequencySelector(
+                        selectedFrequency = selectedRotationFrequency,
+                        onFrequencySelected = { selectedRotationFrequency = it }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    FollowFocusSelector(
+                        followFocus = followFocus,
+                        onToggle = { followFocus = it }
+                    )
+
                     CreateCardActions(
                         onDismiss = onDismiss,
                         isProcessing = isProcessing,
                         enabled = listName.isNotBlank() && (hasPendingFolder || hasPendingPhotos),
-                        onCreate = { onCreateClick(listName, selectedRule) }
+                        onCreate = { onCreateClick(listName, selectedRule, selectedRotationFrequency, followFocus) }
                     )
                 }
 
@@ -140,6 +161,54 @@ fun CreateListCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FollowFocusSelector(
+    followFocus: Boolean,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = followFocus,
+                onValueChange = onToggle,
+                role = Role.Switch
+            )
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "FOCUS MODE AWARE",
+                color = NothingWhite,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+            )
+            Text(
+                text = "DO NOT ROTATE IN FOCUS/DND",
+                color = NothingWhite.copy(alpha = 0.5f),
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+        Switch(
+            checked = followFocus,
+            onCheckedChange = null,
+            modifier = Modifier.scale(0.8f),
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = NothingBlack,
+                checkedTrackColor = NothingWhite,
+                uncheckedThumbColor = NothingWhite,
+                uncheckedTrackColor = NothingBlack,
+                uncheckedBorderColor = NothingWhite.copy(alpha = 0.5f)
+            )
+        )
     }
 }
 
@@ -230,25 +299,9 @@ fun CreateListCardPreview() {
             onDismiss = {},
             onFolderSelect = {},
             onPhotosSelect = {},
-            onCreateClick = { _, _ -> },
+            onCreateClick = { _, _, _, _ -> },
             hasPendingFolder = true,
             hasPendingPhotos = false
-        )
-    }
-}
-
-@Preview(name = "Processing", showBackground = true, backgroundColor = 0xFF000000)
-@Composable
-fun CreateListCardProcessingPreview() {
-    MaterialTheme {
-        CreateListCard(
-            onDismiss = {},
-            onFolderSelect = {},
-            onPhotosSelect = {},
-            onCreateClick = { _, _ -> },
-            isProcessing = true,
-            hasPendingFolder = false,
-            hasPendingPhotos = true
         )
     }
 }
