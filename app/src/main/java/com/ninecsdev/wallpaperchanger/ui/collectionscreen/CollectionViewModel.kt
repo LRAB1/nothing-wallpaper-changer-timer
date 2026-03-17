@@ -88,23 +88,23 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
 
     // Collection CRUD
 
-    fun finalizeFolderCollection(name: String, rule: CropRule, onComplete: () -> Unit) {
+    fun finalizeFolderCollection(name: String, rule: CropRule, frequency: RotationFrequency, skipOnDnd: Boolean, onComplete: () -> Unit) {
         val uri = pendingFolderUri ?: return
         viewModelScope.launch {
             setProcessing(true)
-            repository.importFolderAsCollection(name, uri, rule)
+            repository.importFolderAsCollection(name, uri, rule, frequency, skipOnDnd)
             pendingFolderUri = null
             setProcessing(false)
             onComplete()
         }
     }
 
-    fun finalizeManualCollection(name: String, rule: CropRule, onComplete: () -> Unit) {
+    fun finalizeManualCollection(name: String, rule: CropRule, frequency: RotationFrequency, skipOnDnd: Boolean, onComplete: () -> Unit) {
         if (pendingPhotosUris.isEmpty()) return
         viewModelScope.launch {
             setProcessing(true)
             val internalizedUris = ImageInternalizer.internalizeImages(context, pendingPhotosUris)
-            repository.createManualCollection(name, internalizedUris, rule)
+            repository.createManualCollection(name, internalizedUris, rule, frequency, skipOnDnd)
             pendingPhotosUris = emptyList()
             setProcessing(false)
             onComplete()
@@ -122,10 +122,11 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
         collectionId: Long,
         newName: String,
         cropRule: CropRule,
-        rotationFrequency: RotationFrequency
+        rotationFrequency: RotationFrequency,
+        skipOnDnd: Boolean
     ) {
         viewModelScope.launch {
-            repository.updateCollection(collectionId, newName, cropRule, rotationFrequency)
+            repository.updateCollection(collectionId, newName, cropRule, rotationFrequency, skipOnDnd)
         }
     }
 
