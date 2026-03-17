@@ -43,6 +43,23 @@ object WallpaperRepository {
     private  lateinit var appContext: Context
     private lateinit var dao: WallpaperDao
 
+    /**
+     * In-memory cache of Nothing OS Focus Mode state, updated in real-time by
+     * [WallpaperService] when the Nothing OS focus mode broadcast is received.
+     * Resets to false on process death. Checked as a fast path in [isDndActive].
+     *
+     * Uses [java.util.concurrent.atomic.AtomicBoolean] so that concurrent broadcast deliveries
+     * (e.g. both action variants arriving in quick succession) are thread-safe without locking.
+     */
+    private val _nothingFocusModeActive = java.util.concurrent.atomic.AtomicBoolean(false)
+    val nothingFocusModeActive: Boolean get() = _nothingFocusModeActive.get()
+
+    /** Called by the Nothing OS Focus Mode broadcast receiver in [WallpaperService]. */
+    fun setNothingFocusModeActive(active: Boolean) {
+        _nothingFocusModeActive.set(active)
+        Log.d(TAG, "Nothing OS Focus Mode cache updated: active=$active")
+    }
+
     private val _serviceEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val serviceEvent: SharedFlow<Unit> = _serviceEvent.asSharedFlow()
 
@@ -446,6 +463,9 @@ object WallpaperRepository {
      * Checks if Do Not Disturb, Focus Mode, or Bedtime Mode is currently active.
      */
     fun isDndActive(failSafeWhenUnknown: Boolean = false): Boolean {
+        // 0. Fast path: Nothing OS Focus Mode was signalled via broadcast.
+        if (nothingFocusModeActive) return true
+
         val nm = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         val hasPolicyAccess = nm?.isNotificationPolicyAccessGranted == true
         
@@ -583,8 +603,10 @@ object WallpaperRepository {
                 val looksLikeFocusRule =
                     name.contains("focus") ||
                         name.contains("wellbeing") ||
+                        name.contains("nothing") ||
                         owner.contains("wellbeing") ||
                         owner.contains("digitalwellbeing") ||
+                        owner.contains("nothing") ||
                         owner.contains("focus")
 
                 if (!looksLikeFocusRule) continue

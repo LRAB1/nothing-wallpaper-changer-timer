@@ -38,6 +38,7 @@ class WallpaperService : Service() {
 
     private var screenOffReceiver: BroadcastReceiver? = null
     private var systemEventReceiver: BroadcastReceiver? = null
+    private var nothingFocusModeReceiver: BroadcastReceiver? = null
     // SupervisorJob ensures one failing task doesn't kill the whole service scope
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -47,6 +48,21 @@ class WallpaperService : Service() {
         /** In-memory flag that resets on process death (reboots). */
         @Volatile var isAlive = false
             private set
+
+        /**
+         * Nothing OS Focus Mode broadcast actions. Nothing OS (Phone 1 / Phone 2) fires one of
+         * these when the user enables or disables Focus Mode via Quick Settings or the
+         * Digital Wellbeing settings screen.
+         *
+         * The `com.nothing.wellbeing` action is used on Nothing OS 1.x/2.x (Phone 1).
+         * The `com.nothing.settings` variant is seen on some Nothing OS 2.5+ builds.
+         * Both carry a boolean extra [EXTRA_NOTHING_FOCUS_MODE_ENABLED] (true = active).
+         */
+        const val ACTION_NOTHING_FOCUS_MODE_CHANGED =
+            "com.nothing.wellbeing.action.FOCUS_MODE_STATE_CHANGED"
+        const val ACTION_NOTHING_FOCUS_MODE_CHANGED_ALT =
+            "com.nothing.settings.action.FOCUS_MODE_STATE_CHANGED"
+        const val EXTRA_NOTHING_FOCUS_MODE_ENABLED = "enabled"
     }
 
     private suspend fun applyDefaultWallpaper() {
@@ -83,6 +99,26 @@ class WallpaperService : Service() {
 
         screenOffReceiver = ScreenOffReceiver()
         registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), RECEIVER_EXPORTED)
+
+        // Listen for Nothing OS Focus Mode state changes so that isDndActive() has an accurate
+        // in-memory flag the moment Focus Mode is toggled — before the next screen-off event.
+        nothingFocusModeReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (!intent.hasExtra(EXTRA_NOTHING_FOCUS_MODE_ENABLED)) {
+                    Log.w(tag, "Nothing OS Focus Mode broadcast missing '$EXTRA_NOTHING_FOCUS_MODE_ENABLED' extra " +
+                        "(action=${intent.action}). Nothing OS API may have changed; defaulting to inactive.")
+                    return
+                }
+                val active = intent.getBooleanExtra(EXTRA_NOTHING_FOCUS_MODE_ENABLED, false)
+                Log.d(tag, "Nothing OS Focus Mode broadcast received: enabled=$active (action=${intent.action})")
+                WallpaperRepository.setNothingFocusModeActive(active)
+            }
+        }
+        val nothingFocusFilter = IntentFilter().apply {
+            addAction(ACTION_NOTHING_FOCUS_MODE_CHANGED)
+            addAction(ACTION_NOTHING_FOCUS_MODE_CHANGED_ALT)
+        }
+        registerReceiver(nothingFocusModeReceiver, nothingFocusFilter, RECEIVER_EXPORTED)
 
         systemEventReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -214,6 +250,7 @@ class WallpaperService : Service() {
 
         screenOffReceiver?.let { unregisterReceiver(it) }
         systemEventReceiver?.let { unregisterReceiver(it) }
+        nothingFocusModeReceiver?.let { unregisterReceiver(it) }
 
         WallpaperRepository.clearMagazine()
         serviceScope.cancel()
