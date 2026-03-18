@@ -1,11 +1,10 @@
 package com.ninecsdev.wallpaperchanger.ui
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.Intent
 import android.os.Bundle
-import android.os.PowerManager
 import android.provider.Settings
-import android.app.NotificationManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
@@ -27,7 +26,6 @@ import com.ninecsdev.wallpaperchanger.ui.collectionscreen.EditCollectionCard
 import com.ninecsdev.wallpaperchanger.ui.mainscreen.MainScreen
 import com.ninecsdev.wallpaperchanger.ui.mainscreen.MainViewModel
 import com.ninecsdev.wallpaperchanger.ui.theme.NothingWhite
-import androidx.core.net.toUri
 
 class MainActivity : ComponentActivity() {
 
@@ -73,13 +71,6 @@ class MainActivity : ComponentActivity() {
         uri?.let { mainViewModel.internalizeAndSaveDefaultWallpaper(it) }
     }
 
-    // Battery optimization exemption (Required for boot-start)
-    private val batteryExemptionLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
-        startWallpaperService()
-    }
-
     // Notification policy access (improves DND/Focus detection reliability)
     private val notificationPolicyLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -103,13 +94,8 @@ class MainActivity : ComponentActivity() {
                                 uiState = collectionState,
                                 onRequestPreview = { collectionViewModel.loadPreview(it) },
                                 onCollectionClick = { id ->
-                                    if (collectionState.isPickerMode) {
-                                        mainViewModel.setActiveCollection(id)
-                                        mainViewModel.setShowLists(false)
-                                    } else {
-                                        val collection = collectionState.allCollections.find { it.id == id }
-                                        collection?.let { collectionViewModel.openEditModal(it) }
-                                    }
+                                    val collection = collectionState.allCollections.find { it.id == id }
+                                    collection?.let { collectionViewModel.openEditModal(it) }
                                 },
                                 onSortOrderChange = { collectionViewModel.setSortOrder(it) },
                                 onAddClick = { collectionViewModel.toggleCreateModal(true) },
@@ -119,11 +105,9 @@ class MainActivity : ComponentActivity() {
                             MainScreen(
                                 uiState = mainState,
                                 onSelectFolderClick = {
-                                    collectionViewModel.setPickerMode(true)
                                     mainViewModel.setShowLists(true)
                                 },
                                 onOpenCollectionsClick = {
-                                    collectionViewModel.setPickerMode(false)
                                     mainViewModel.setShowLists(true)
                                 },
                                 onSelectDefaultClick = {
@@ -230,26 +214,12 @@ class MainActivity : ComponentActivity() {
         notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    /**
-     * Checks battery optimization exemption before starting the service.
-     * If not exempted, shows a system dialog first, then starts the service
-     * regardless of the user's choice (it only affects boot-start behavior).
-     */
     private fun startWallpaperService() {
         val notificationManager = getSystemService(NotificationManager::class.java)
         val activeCollectionNeedsDndProtection = mainViewModel.uiState.value.activeCollection?.skipOnDnd == true
         if (activeCollectionNeedsDndProtection && notificationManager?.isNotificationPolicyAccessGranted == false) {
             val policyIntent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
             notificationPolicyLauncher.launch(policyIntent)
-            return
-        }
-
-        val pm = getSystemService(POWER_SERVICE) as PowerManager
-        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                data = "package:$packageName".toUri()
-            }
-            batteryExemptionLauncher.launch(intent)
             return
         }
 

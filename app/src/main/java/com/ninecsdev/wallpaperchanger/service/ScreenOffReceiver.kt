@@ -72,23 +72,6 @@ class ScreenOffReceiver : BroadcastReceiver() {
                     )
                 }
 
-
-                if (!activeCollection.shouldRotateAt()) {
-                    val frequencyLabel = when (activeCollection.rotationFrequency) {
-                        RotationFrequency.PER_LOCK -> "per lock"
-                        RotationFrequency.HOURLY -> "hourly"
-                        RotationFrequency.PER_DAY -> "daily"
-                    }
-                    Log.d(tag, "Rotation skipped. Timer for $frequencyLabel not met yet.")
-                    return@launch
-                }
-
-                val activeCollection = WallpaperRepository.getActiveCollectionOnce()
-                if (activeCollection == null) {
-                    Log.w(tag, "No active collection found. Skipping wallpaper change.")
-                    return@launch
-                }
-
                 if (!activeCollection.shouldRotateAt()) {
                     val frequencyLabel = when (activeCollection.rotationFrequency) {
                         RotationFrequency.PER_LOCK -> "per lock"

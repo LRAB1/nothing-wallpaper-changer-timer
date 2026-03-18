@@ -25,7 +25,6 @@ import kotlinx.coroutines.launch
  */
 class CollectionViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = WallpaperRepository
-    private val context = application.applicationContext
 
     // Internal mutable state
 
@@ -60,7 +59,6 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
             previewStates = previews,
             serviceState = repository.getServiceState(),
             sortOrder = sort,
-            isPickerMode = modal.isPickerMode,
             isShowingCreateModal = modal.isShowingCreateModal,
             editingCollection = modal.editingCollection,
             isProcessing = modal.isProcessing
@@ -103,7 +101,8 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
         if (pendingPhotosUris.isEmpty()) return
         viewModelScope.launch {
             setProcessing(true)
-            val internalizedUris = ImageInternalizer.internalizeImages(context, pendingPhotosUris)
+            val appContext = getApplication<Application>().applicationContext
+            val internalizedUris = ImageInternalizer.internalizeImages(appContext, pendingPhotosUris)
             repository.createManualCollection(name, internalizedUris, rule, frequency, skipOnDnd)
             pendingPhotosUris = emptyList()
             setProcessing(false)
@@ -167,10 +166,6 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
 
     // Modal/navigation helpers
 
-    fun setPickerMode(picker: Boolean) {
-        _screenState.update { it.copy(isPickerMode = picker) }
-    }
-
     fun toggleCreateModal(show: Boolean) {
         _screenState.update { it.copy(isShowingCreateModal = show) }
     }
@@ -190,7 +185,6 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
 
 /** Internal holder so modal flags can be combined as a single flow. */
 private data class ScreenModalState(
-    val isPickerMode: Boolean = false,
     val isShowingCreateModal: Boolean = false,
     val editingCollection: WallpaperCollection? = null,
     val isProcessing: Boolean = false
